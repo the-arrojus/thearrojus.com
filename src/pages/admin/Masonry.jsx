@@ -23,39 +23,37 @@ import { AnimatePresence, motion } from "framer-motion";
 import Button from "../../components/Button";
 
 /* -------------------- image tuning -------------------- */
-const OPT_MAX_DIM = 2400;     // resize ceiling (keeps quality high for tall images)
-const OPT_QUALITY = 0.9;      // JPEG quality
-const TINY_DIM = 20;          // tiny LQIP size for blur placeholder
+const OPT_MAX_DIM = 2400;
+const OPT_QUALITY = 0.9;
+const TINY_DIM = 20;
 
 function shouldSkipOptimization(file, imgWidth, imgHeight) {
   const longest = Math.max(imgWidth, imgHeight);
   return (
     file?.type === "image/jpeg" &&
     longest <= 2200 &&
-    file.size <= 2.5 * 1024 * 1024 // <= 2.5MB
+    file.size <= 2.5 * 1024 * 1024
   );
 }
-/* ------------------------------------------------------ */
 
 /* ----------------- drag edge auto-scroll -------------- */
-const EDGE_PX = 96;     // distance from viewport edges to trigger scroll
-const MIN_SPEED = 6;    // px per frame minimum scroll
-const MAX_SPEED = 28;   // px per frame maximum scroll
+const EDGE_PX = 96;
+const MIN_SPEED = 6;
+const MAX_SPEED = 28;
 
 function calcSpeed(y, vh) {
   if (y < EDGE_PX) {
-    const t = (EDGE_PX - y) / EDGE_PX; // 0..1
+    const t = (EDGE_PX - y) / EDGE_PX;
     return -Math.max(MIN_SPEED, t * MAX_SPEED);
   }
   if (y > vh - EDGE_PX) {
-    const t = (y - (vh - EDGE_PX)) / EDGE_PX; // 0..1
+    const t = (y - (vh - EDGE_PX)) / EDGE_PX;
     return Math.max(MIN_SPEED, t * MAX_SPEED);
   }
   return 0;
 }
-/* ------------------------------------------------------ */
 
-// --- image helpers (optimize + tiny blur for UX) ---
+/* ------------------------------------------------------ */
 async function fileToImageBitmap(file) {
   return await createImageBitmap(file);
 }
@@ -70,13 +68,12 @@ function drawToCanvas(imgBitmap, maxDim, quality = OPT_QUALITY) {
   const ctx = canvas.getContext("2d");
   ctx.drawImage(imgBitmap, 0, 0, w, h);
   return {
-    toBlob: () => new Promise((res) => canvas.toBlob(res, "image/jpeg", quality)),
+    toBlob: () =>
+      new Promise((res) => canvas.toBlob(res, "image/jpeg", quality)),
   };
 }
 async function makeOptimizedAndBlur(file) {
   const img = await fileToImageBitmap(file);
-
-  // Smart: keep original as "optimized" if it's already modest.
   let optimizedBlob;
   if (shouldSkipOptimization(file, img.width, img.height)) {
     optimizedBlob = file;
@@ -85,7 +82,6 @@ async function makeOptimizedAndBlur(file) {
     optimizedBlob = await opt.toBlob();
   }
 
-  // Tiny LQIP for blurDataURL
   const tiny = drawToCanvas(img, TINY_DIM, 0.7);
   const tinyBlob = await tiny.toBlob();
   const blurDataURL = await new Promise((res) => {
@@ -95,9 +91,8 @@ async function makeOptimizedAndBlur(file) {
   });
   return { optimizedBlob, blurDataURL };
 }
-// ----------------------------------------------------
 
-// Recursively delete everything under a "folder" prefix in Storage
+/* ---------------------------------------------------- */
 async function deleteFolder(path) {
   const folderRef = ref(storage, path);
   const { items, prefixes } = await listAll(folderRef);
@@ -105,73 +100,72 @@ async function deleteFolder(path) {
   await Promise.all(prefixes.map((p) => deleteFolder(p.fullPath)));
 }
 
-// Masonry: allow more images than the 5-card gallery grid
 const MAX_MASONRY = 40;
 
-export default function Masonry() {
-  const [items, setItems] = useState([]);            // [{id,index,optimizedURL,...}]
-  const [busyGlobal, setBusyGlobal] = useState(false);
-  const [busyIds, setBusyIds] = useState(new Set()); // disabling buttons per item
-  const [dragId, setDragId] = useState(null);
+/* ---------- Accessibility hook for reduced motion ---------- */
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = () => setReduced(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return reduced;
+}
 
-  // Single, top upload progress bar (overall)
+/* ---------- Animated image (with badge) ---------- */
+function MasonryAnimatedImage({ src, alt = "", badgeContent }) {
+  const reduce = usePrefersReducedMotion();
+  return (
+    <div className="relative grid [grid-template-areas:_'stack'] overflow-hidden">
+      {badgeContent && (
+        <span className="absolute left-2 top-2 z-30 rounded-full bg-black/60 text-white text-xs px-2 py-1 leading-none">
+          {badgeContent}
+        </span>
+      )}
+      <AnimatePresence initial={false} mode="popLayout">
+        <motion.img
+          key={src}
+          src={src}
+          alt={alt}
+          draggable={false}
+          loading="lazy"
+          className="block w-full h-auto object-cover [grid-area:stack]"
+          initial={{ opacity: 0, scale: reduce ? 1.0 : 1.02 }}
+          animate={{
+            opacity: 1,
+            scale: 1.0,
+            transition: {
+              opacity: { duration: reduce ? 0.15 : 0.7, ease: "easeOut" },
+              scale: { duration: reduce ? 0.0 : 7.0, ease: "linear" },
+            },
+          }}
+          exit={{ opacity: 0, transition: { duration: reduce ? 0.1 : 0.4 } }}
+          style={{ willChange: "opacity, transform" }}
+        />
+      </AnimatePresence>
+    </div>
+  );
+}
+
+/* ---------- Main Masonry Component ---------- */
+export default function Masonry() {
+  const [items, setItems] = useState([]);
+  const [busyGlobal, setBusyGlobal] = useState(false);
+  const [busyIds, setBusyIds] = useState(new Set());
+  const [dragId, setDragId] = useState(null);
   const [overall, setOverall] = useState({ totalBytes: 0, transferred: 0, active: 0 });
 
-  // Hidden file inputs (main upload + per-item replace)
   const uploadInputRef = useRef(null);
-  const replaceInputRefs = useRef({}); // {itemId: input}
-
-  // Optional: if you switch to a scrollable container instead of window scrolling
+  const replaceInputRefs = useRef({});
   const containerRef = useRef(null);
 
-  // Drag auto-scroll state
-  const dragAuto = useRef({
-    active: false,
-    y: 0,
-    raf: 0,
-    targetEl: null,
-    cleanup: null,
-  });
-
-  function startAutoScroll() {
-    if (dragAuto.current.active) return;
-    dragAuto.current.active = true;
-    dragAuto.current.targetEl = null; // set to containerRef.current if you use a scrollable div
-
-    const onDragOverWindow = (e) => {
-      dragAuto.current.y = e.clientY ?? 0;
-      e.preventDefault(); // keep dragover firing continuously
-    };
-
-    const step = () => {
-      if (!dragAuto.current.active) return;
-      const vh = window.innerHeight || 0;
-      const dy = calcSpeed(dragAuto.current.y, vh);
-      if (dy !== 0) window.scrollBy(0, dy);
-      dragAuto.current.raf = requestAnimationFrame(step);
-    };
-
-    window.addEventListener("dragover", onDragOverWindow, { passive: false });
-    document.addEventListener("dragover", onDragOverWindow, { passive: false });
-
-    dragAuto.current.cleanup = () => {
-      window.removeEventListener("dragover", onDragOverWindow);
-      document.removeEventListener("dragover", onDragOverWindow);
-      if (dragAuto.current.raf) cancelAnimationFrame(dragAuto.current.raf);
-      dragAuto.current.raf = 0;
-      dragAuto.current.active = false;
-      dragAuto.current.targetEl = null;
-    };
-
-    dragAuto.current.raf = requestAnimationFrame(step);
-  }
-
-  function stopAutoScroll() {
-    dragAuto.current.cleanup?.();
-  }
+  const dragAuto = useRef({ active: false, y: 0, raf: 0, cleanup: null });
 
   useEffect(() => {
-    // Real-time: keep masonry collection in sync and ordered
     const q = query(collection(db, "masonry"), orderBy("index", "asc"), limit(MAX_MASONRY));
     const unsub = onSnapshot(q, (snap) => {
       const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
@@ -179,16 +173,14 @@ export default function Masonry() {
     });
     return () => {
       unsub();
-      stopAutoScroll(); // safety cleanup on unmount
+      dragAuto.current.cleanup?.();
     };
   }, []);
 
   const canAdd = items.length < MAX_MASONRY;
 
-  // Reusable uploader with single overall progress
   async function uploadOriginalAndOptimized({ file, id }) {
     const { optimizedBlob, blurDataURL } = await makeOptimizedAndBlur(file);
-
     const originalRef = ref(storage, `masonry/${id}/original.jpg`);
     const optimizedRef = ref(storage, `masonry/${id}/optimized.jpg`);
 
@@ -196,84 +188,67 @@ export default function Masonry() {
     let origPrev = 0;
     let optPrev = 0;
 
-    // mark one active job
     setOverall((s) => ({
       totalBytes: s.totalBytes + totalBytes,
       transferred: s.transferred,
       active: s.active + 1,
     }));
 
-    const bump = (deltaOrig, deltaOpt) => {
+    const bump = (deltaOrig, deltaOpt) =>
       setOverall((s) => ({ ...s, transferred: s.transferred + deltaOrig + deltaOpt }));
-    };
 
-    const originalTask = uploadBytesResumable(originalRef, file, {
-      contentType: file.type || "image/jpeg",
-    });
-    const optimizedTask = uploadBytesResumable(optimizedRef, optimizedBlob, {
-      contentType: "image/jpeg",
-    });
+    const originalTask = uploadBytesResumable(originalRef, file, { contentType: file.type });
+    const optimizedTask = uploadBytesResumable(optimizedRef, optimizedBlob, { contentType: "image/jpeg" });
 
-    const origPromise = new Promise((resolve, reject) => {
-      originalTask.on(
-        "state_changed",
-        (snap) => {
+    await Promise.all([
+      new Promise((res, rej) =>
+        originalTask.on("state_changed", (snap) => {
           const delta = snap.bytesTransferred - origPrev;
           origPrev = snap.bytesTransferred;
           bump(delta, 0);
-        },
-        reject,
-        resolve
-      );
-    });
-
-    const optPromise = new Promise((resolve, reject) => {
-      optimizedTask.on(
-        "state_changed",
-        (snap) => {
+        }, rej, res)
+      ),
+      new Promise((res, rej) =>
+        optimizedTask.on("state_changed", (snap) => {
           const delta = snap.bytesTransferred - optPrev;
           optPrev = snap.bytesTransferred;
           bump(0, delta);
-        },
-        reject,
-        resolve
-      );
-    });
-
-    await Promise.all([origPromise, optPromise]);
+        }, rej, res)
+      ),
+    ]);
 
     const [originalURL, optimizedURL] = await Promise.all([
       getDownloadURL(originalRef),
       getDownloadURL(optimizedRef),
     ]);
 
-    // mark job complete
     setOverall((s) => {
       const nextActive = Math.max(0, s.active - 1);
       const doneAll = nextActive === 0 && s.transferred >= s.totalBytes;
-      return doneAll ? { totalBytes: 0, transferred: 0, active: 0 } : { ...s, active: nextActive };
+      return doneAll
+        ? { totalBytes: 0, transferred: 0, active: 0 }
+        : { ...s, active: nextActive };
     });
 
     return { originalURL, optimizedURL, blurDataURL };
   }
 
-  // Handle new uploads (can be multiple files)
   const onPick = async (e) => {
     const files = Array.from(e.target.files || []);
     e.target.value = "";
-    if (!files.length) return;
-    if (!canAdd) return alert(`Masonry is full (max ${MAX_MASONRY}).`);
+    if (!files.length || !canAdd) return;
 
     setBusyGlobal(true);
     try {
-      const slots = Math.max(0, MAX_MASONRY - items.length);
+      const slots = MAX_MASONRY - items.length;
       const selected = files.slice(0, slots);
 
       for (let i = 0; i < selected.length; i++) {
         const file = selected[i];
-        const id = (crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`)
-          .toString()
-          .replace(/-/g, "");
+        const id =
+          (crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`)
+            .toString()
+            .replace(/-/g, "");
         const nextIndex = items.length + 1 + i;
 
         const { originalURL, optimizedURL, blurDataURL } =
@@ -295,21 +270,15 @@ export default function Masonry() {
       alert("Upload failed.");
     } finally {
       setBusyGlobal(false);
-      // overall auto-resets when all active jobs finish
     }
   };
 
-  // Replace one image (keeps same doc id and index)
-  const onReplaceClick = (item) => {
-    replaceInputRefs.current[item.id]?.click();
-  };
   const onReplaceFile = async (item, file) => {
     if (!file) return;
     setBusyIds((s) => new Set(s).add(item.id));
     try {
       const { originalURL, optimizedURL, blurDataURL } =
         await uploadOriginalAndOptimized({ file, id: item.id });
-
       await setDoc(
         doc(db, "masonry", item.id),
         { originalURL, optimizedURL, blurDataURL, updatedAt: serverTimestamp() },
@@ -327,31 +296,26 @@ export default function Masonry() {
     }
   };
 
-  // Delete image: remove folder, Firestore doc, then reindex
+  const onReplaceClick = (item) => replaceInputRefs.current[item.id]?.click();
+
   const onDelete = async (item) => {
     if (!confirm("Delete this image?")) return;
-
     const prev = items;
     const next = prev.filter((x) => x.id !== item.id).map((x, i) => ({ ...x, index: i + 1 }));
     setItems(next);
     setBusyIds((s) => new Set(s).add(item.id));
-
     try {
       await deleteFolder(`masonry/${item.id}`);
       await deleteDoc(doc(db, "masonry", item.id));
 
       const batch = writeBatch(db);
-      next.forEach((x, i) => {
-        batch.set(
-          doc(db, "masonry", x.id),
-          { index: i + 1, updatedAt: serverTimestamp() },
-          { merge: true }
-        );
-      });
+      next.forEach((x, i) =>
+        batch.set(doc(db, "masonry", x.id), { index: i + 1, updatedAt: serverTimestamp() }, { merge: true })
+      );
       await batch.commit();
     } catch (err) {
       console.error(err);
-      alert("Delete failed. Restoring previous state.");
+      alert("Delete failed.");
       setItems(prev);
     } finally {
       setBusyIds((s) => {
@@ -362,18 +326,9 @@ export default function Masonry() {
     }
   };
 
-  // Drag & drop reorder (Framer Motion animates layout)
-  const onDragStart = (id) => {
-    setDragId(id);
-    startAutoScroll(); // start edge auto-scroll
-  };
-
-  const onDragOver = (e) => {
-    e.preventDefault(); // keep allowing drops & continuous dragover events
-  };
-
+  const onDragStart = (id) => setDragId(id);
+  const onDragOver = (e) => e.preventDefault();
   const onDrop = async (overId) => {
-    stopAutoScroll(); // stop when drop happens
     if (!dragId || dragId === overId) return;
     const current = [...items];
     const from = current.findIndex((i) => i.id === dragId);
@@ -385,22 +340,17 @@ export default function Masonry() {
     try {
       const batch = writeBatch(db);
       reindexed.forEach((x, i) =>
-        batch.set(
-          doc(db, "masonry", x.id),
-          { index: i + 1, updatedAt: serverTimestamp() },
-          { merge: true }
-        )
+        batch.set(doc(db, "masonry", x.id), { index: i + 1, updatedAt: serverTimestamp() }, { merge: true })
       );
       await batch.commit();
     } catch (err) {
       console.error(err);
-      alert("Reorder failed. Reloading…");
+      alert("Reorder failed.");
     } finally {
       setDragId(null);
     }
   };
 
-  // Top upload progress (overall)
   const uploadPct = useMemo(() => {
     if (!overall.totalBytes) return 0;
     return Math.min(100, Math.round((overall.transferred / overall.totalBytes) * 100));
@@ -410,11 +360,8 @@ export default function Masonry() {
 
   return (
     <div ref={containerRef} className="p-6 space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Masonry</h1>
-
-        {/* Upload button (shadcn-style) */}
         <div className="flex items-center gap-3">
           <Button
             onClick={() => uploadInputRef.current?.click()}
@@ -425,8 +372,6 @@ export default function Masonry() {
           >
             {canAdd ? "Upload" : "Full"}
           </Button>
-
-          {/* Hidden file input controlled by the button above */}
           <input
             type="file"
             accept="image/*"
@@ -439,7 +384,6 @@ export default function Masonry() {
         </div>
       </div>
 
-      {/* Single top upload progress bar */}
       {overall.totalBytes > 0 && (
         <div className="w-full rounded-lg bg-gray-200 overflow-hidden">
           <div
@@ -449,7 +393,6 @@ export default function Masonry() {
         </div>
       )}
 
-      {/* While uploading & empty: simple loading */}
       {isUploading && items.length === 0 && (
         <div className="rounded-xl border p-6 text-center bg-white text-gray-700">
           <div className="flex items-center justify-center gap-3">
@@ -462,18 +405,8 @@ export default function Masonry() {
         </div>
       )}
 
-      {/* Masonry columns */}
       {items.length > 0 && (
-        <div
-          className="
-            [column-fill:_balance]
-            columns-1
-            sm:columns-2
-            lg:columns-3
-            xl:columns-4
-            gap-4
-          "
-        >
+        <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4 [column-fill:_balance]">
           <AnimatePresence initial={false}>
             {items.map((it) => {
               const itemBusy = busyIds.has(it.id) || isUploading;
@@ -490,60 +423,45 @@ export default function Masonry() {
                   onDragStart={() => !isUploading && onDragStart(it.id)}
                   onDragOver={(e) => !isUploading && onDragOver(e)}
                   onDrop={() => !isUploading && onDrop(it.id)}
-                  onDragEnd={stopAutoScroll}
                   title={isUploading ? "" : "Drag to reorder"}
                 >
-                  {/* Media auto-height for real masonry */}
-                  <img
+                  <MasonryAnimatedImage
                     src={it.optimizedURL}
-                    alt=""
-                    className="object-cover block"
-                    loading="lazy"
-                    draggable={false}
+                    alt={`Masonry image ${it.index}`}
+                    badgeContent={`#${it.index}`}
                   />
-
-                  {/* Footer */}
-                  <div className="p-3 flex items-center justify-between text-sm">
-                    <span className="text-gray-700">
-                      Index: <b>{it.index}</b>
-                    </span>
-                    <div className="flex items-center gap-2">
-                      {/* Replace */}
-                      <Button
-                        onClick={() => onReplaceClick(it)}
-                        disabled={itemBusy}
-                        loading={busyIds.has(it.id)}
-                        loadingText="Working…"
-                        variant="secondary"
-                        size="sm"
-                      >
-                        Replace
-                      </Button>
-
-                      <input
-                        type="file"
-                        accept="image/*"
-                        hidden
-                        ref={(el) => (replaceInputRefs.current[it.id] = el)}
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          e.target.value = "";
-                          if (f) onReplaceFile(it, f);
-                        }}
-                      />
-
-                      {/* Delete */}
-                      <Button
-                        onClick={() => onDelete(it)}
-                        disabled={itemBusy}
-                        loading={busyIds.has(it.id)}
-                        loadingText="Deleting…"
-                        variant="destructive"
-                        size="sm"
-                      >
-                        Delete
-                      </Button>
-                    </div>
+                  <div className="p-3 flex items-center justify-end text-sm gap-2">
+                    <Button
+                      onClick={() => onReplaceClick(it)}
+                      disabled={itemBusy}
+                      loading={busyIds.has(it.id)}
+                      loadingText="Working…"
+                      variant="secondary"
+                      size="sm"
+                    >
+                      Replace
+                    </Button>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      ref={(el) => (replaceInputRefs.current[it.id] = el)}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        e.target.value = "";
+                        if (f) onReplaceFile(it, f);
+                      }}
+                    />
+                    <Button
+                      onClick={() => onDelete(it)}
+                      disabled={itemBusy}
+                      loading={busyIds.has(it.id)}
+                      loadingText="Deleting…"
+                      variant="destructive"
+                      size="sm"
+                    >
+                      Delete
+                    </Button>
                   </div>
                 </motion.div>
               );

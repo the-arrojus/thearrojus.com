@@ -1,8 +1,9 @@
 // src/pages/AdminTestimonials.jsx
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/auth";
-import { db } from "../../lib/firebase";
+import { db, storage } from "../../lib/firebase"; // ensure storage is exported
 import Button from "../../components/Button";
+import AvatarCropper from "../../components/AvatarCropper";
 import {
   collection,
   doc,
@@ -15,6 +16,7 @@ import {
   Timestamp,
   where,
 } from "firebase/firestore";
+import { getDownloadURL, ref, uploadBytes, deleteObject } from "firebase/storage";
 
 function makeToken() {
   return crypto.randomUUID().replace(/-/g, "");
@@ -39,16 +41,42 @@ function InviteRow({ invite, status }) {
 
   return (
     <div className="rounded-xl border p-3 bg-white flex items-start justify-between gap-4">
-      <div className="space-y-1 text-sm">
-        <div className="font-medium">{invite.clientName}</div>
-        <div className="text-gray-700">{invite.event}</div>
-        <div className="font-mono break-all text-gray-600">{link}</div>
-        <div className="text-xs text-gray-500">
-          Expires: {exp.toLocaleString()}
-        </div>
-        {status === "expired" && (
-          <div className="text-xs font-medium text-orange-600">Expired</div>
+      <div className="flex items-start gap-3">
+        {invite.avatarUrl ? (
+          <img
+            src={invite.avatarUrl}
+            alt={`${invite.clientName} avatar`}
+            className="h-14 w-14 rounded-full object-cover border"
+            loading="lazy"
+          />
+        ) : (
+          <div className="h-14 w-14 rounded-full bg-gray-200 grid place-items-center text-sm text-gray-500">
+            {invite.clientName?.[0] || "?"}
+          </div>
         )}
+        <div className="space-y-1 text-sm">
+          <div className="font-medium">{invite.clientName}</div>
+          <div className="text-gray-700">{invite.event}</div>
+          {invite.eventPlace && (
+            <div className="text-gray-600">Place: {invite.eventPlace}</div>
+          )}
+          {invite.eventDate && (
+            <div className="text-gray-600">
+              Date: {(
+                invite.eventDate instanceof Timestamp
+                  ? invite.eventDate.toDate()
+                  : new Date(invite.eventDate)
+              ).toLocaleDateString()}
+            </div>
+          )}
+          <div className="font-mono break-all text-gray-600">{link}</div>
+          <div className="text-xs text-gray-500">
+            Expires: {exp.toLocaleString()}
+          </div>
+          {status === "expired" && (
+            <div className="text-xs font-medium text-orange-600">Expired</div>
+          )}
+        </div>
       </div>
       <div className="flex items-center gap-2">
         <span
@@ -85,6 +113,13 @@ export default function AdminTestimonials() {
   const { user } = useAuth();
   const [eventName, setEventName] = useState("");
   const [clientName, setClientName] = useState("");
+  const [eventPlace, setEventPlace] = useState("");
+  const [eventDate, setEventDate] = useState(""); // yyyy-mm-dd
+  const [inviteToken, setInviteToken] = useState(""); // persist token when avatar is uploaded
+  const [avatarUrl, setAvatarUrl] = useState(""); // public URL after upload
+  const [rawAvatarFile, setRawAvatarFile] = useState(null);
+  const [showCropper, setShowCropper] = useState(false);
+
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
   const [invites, setInvites] = useState([]);
@@ -126,6 +161,40 @@ export default function AdminTestimonials() {
     return () => unsub();
   }, [user]);
 
+  const ensureToken = () => {
+    if (!inviteToken) {
+      const t = makeToken();
+      setInviteToken(t);
+      return t;
+    }
+    return inviteToken;
+  };
+
+  const handleChooseAvatar = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setRawAvatarFile(file);
+    setShowCropper(true);
+  };
+
+  const uploadAvatarBlob = async (blob, token) => {
+    const storageRef = ref(storage, `avatars/${token}/avatar.jpg`);
+    await uploadBytes(storageRef, blob, { contentType: "image/jpeg" });
+    const url = await getDownloadURL(storageRef);
+    setAvatarUrl(url);
+    return url;
+  };
+
+  const clearAvatar = async () => {
+    try {
+      if (!inviteToken) return;
+      await deleteObject(ref(storage, `avatars/${inviteToken}/avatar.jpg`));
+    } catch {}
+    setAvatarUrl("");
+    setRawAvatarFile(null);
+    setShowCropper(false);
+  };
+
   const createInvite = async (e) => {
     e.preventDefault();
     setErr(null);
@@ -136,20 +205,30 @@ export default function AdminTestimonials() {
 
     setBusy(true);
     try {
-      const token = makeToken();
+      const token = ensureToken();
       const expiresAt = Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000);
+      const eventDateTs = eventDate ? Timestamp.fromDate(new Date(eventDate)) : null;
 
       await setDoc(doc(db, "testimonialInvites", token), {
         token,
         adminUid: user.uid,
         event: eventName.trim(),
         clientName: clientName.trim(),
+        eventPlace: eventPlace.trim() || null,
+        eventDate: eventDateTs,
+        avatarUrl: avatarUrl || null,
         createdAt: serverTimestamp(),
         expiresAt,
       });
 
       setEventName("");
       setClientName("");
+      setEventPlace("");
+      setEventDate("");
+      setInviteToken("");
+      setAvatarUrl("");
+      setRawAvatarFile(null);
+      setShowCropper(false);
     } catch (e) {
       setErr(e?.message || "Failed to create invite");
     } finally {
@@ -212,6 +291,52 @@ export default function AdminTestimonials() {
             />
           </div>
 
+          <div className="sm:col-span-3">
+            <label className="block text-sm/6 font-medium text-gray-900">Event Date</label>
+            <input
+              type="date"
+              value={eventDate}
+              onChange={(e) => setEventDate(e.target.value)}
+              className="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-indigo-600"
+            />
+          </div>
+
+          <div className="sm:col-span-3">
+            <label className="block text-sm/6 font-medium text-gray-900">Event Place</label>
+            <input
+              type="text"
+              value={eventPlace}
+              onChange={(e) => setEventPlace(e.target.value)}
+              placeholder="Venue / City"
+              className="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-indigo-600"
+            />
+          </div>
+
+          {/* Avatar uploader */}
+          <div className="sm:col-span-6">
+            <label className="block text-sm/6 font-medium text-gray-900">Client Avatar</label>
+            <div className="mt-2 flex items-center gap-4">
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt="avatar preview"
+                  className="h-16 w-16 rounded-full object-cover border"
+                />
+              ) : (
+                <div className="h-16 w-16 rounded-full bg-gray-200" />
+              )}
+              <div className="flex items-center gap-3">
+                <input type="file" accept="image/*" onChange={handleChooseAvatar} />
+                {avatarUrl && (
+                  <Button type="button" variant="outline" onClick={clearAvatar}>
+                    Remove
+                  </Button>
+                )}
+              </div>
+            </div>
+            <p className="mt-1 text-xs text-gray-500">Square crop is applied; images are public.</p>
+          </div>
+
           <div className="col-span-full flex items-center gap-3">
             <Button type="submit" loading={busy} loadingText="Generating…">
               Generate 24-hour link
@@ -264,6 +389,23 @@ export default function AdminTestimonials() {
           </div>
         </details>
       </section>
+
+      {showCropper && rawAvatarFile && (
+        <AvatarCropper
+          file={rawAvatarFile}
+          onCancel={() => {
+            setShowCropper(false);
+            setRawAvatarFile(null);
+          }}
+          onCropped={async (blob) => {
+            const token = ensureToken();
+            const url = await uploadAvatarBlob(blob, token);
+            setShowCropper(false);
+            setRawAvatarFile(null);
+            setAvatarUrl(url);
+          }}
+        />
+      )}
     </div>
   );
 }
