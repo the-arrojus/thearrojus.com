@@ -89,6 +89,55 @@ async function deleteFolder(path) {
 
 const MAX_IMAGES = 5;
 
+/* ---------- Accessibility hook for reduced motion ---------- */
+function usePrefersReducedMotion() {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = () => setReduced(mq.matches);
+    onChange();
+    if (mq.addEventListener) mq.addEventListener("change", onChange);
+    else mq.addListener(onChange);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", onChange);
+      else mq.removeListener(onChange);
+    };
+  }, []);
+  return reduced;
+}
+
+/* ---------- Animated image: cross-fade + gentle zoom ---------- */
+function AnimatedImage({ src, alt = "" }) {
+  const reduce = usePrefersReducedMotion();
+
+  // When `src` changes (replace), AnimatePresence will cross-fade old->new.
+  return (
+    <div className="relative w-full h-full">
+      <AnimatePresence initial={false} mode="popLayout">
+        <motion.img
+          key={src}
+          src={src}
+          alt={alt}
+          draggable={false}
+          className="absolute inset-0 object-cover"
+          initial={{ opacity: 0, scale: reduce ? 1.0 : 1.02 }}
+          animate={{
+            opacity: 1,
+            scale: 1.0,
+            transition: {
+              opacity: { duration: reduce ? 0.15 : 0.7, ease: "easeOut" },
+              scale: { duration: reduce ? 0.0 : 7.0, ease: "linear" },
+            },
+          }}
+          exit={{ opacity: 0, transition: { duration: reduce ? 0.1 : 0.4 } }}
+          style={{ willChange: "opacity, transform" }}
+        />
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export default function AdminCarousel() {
   const [items, setItems] = useState([]);            // [{id,index,optimizedURL,...}]
   const [busyGlobal, setBusyGlobal] = useState(false);
@@ -391,72 +440,69 @@ export default function AdminCarousel() {
               const itemBusy = busyIds.has(it.id) || isUploading;
               return (
                 <motion.div
-                  key={it.id}
-                  layout
-                  initial={{ opacity: 0.6, scale: 0.98 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  className="rounded-xl border bg-white overflow-hidden flex flex-col"
-                  draggable
-                  onDragStart={() => !isUploading && onDragStart(it.id)}
-                  onDragOver={(e) => !isUploading && onDragOver(e)}
-                  onDrop={() => !isUploading && onDrop(it.id)}
-                  title={isUploading ? "" : "Drag to reorder"}
-                >
-                  {/* Media area (fixed aspect) */}
-                  <div className="aspect-[4/3] w-full overflow-hidden">
-                    <img
-                      src={it.optimizedURL}
-                      alt=""
-                      className="object-cover"
-                      loading="lazy"
-                      draggable={false}
-                    />
-                  </div>
+  key={it.id}
+  layout
+  initial={{ opacity: 0.6, scale: 0.98 }}
+  animate={{ opacity: 1, scale: 1 }}
+  exit={{ opacity: 0 }}
+  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+  className="rounded-xl border bg-white overflow-hidden flex flex-col"
+  draggable
+  onDragStart={() => !isUploading && onDragStart(it.id)}
+  onDragOver={(e) => !isUploading && onDragOver(e)}
+  onDrop={() => !isUploading && onDrop(it.id)}
+  title={isUploading ? "" : "Drag to reorder"}
+>
+  {/* Media area (fixed aspect) */}
+  <div className="aspect-[3/2] overflow-hidden relative">
+    <AnimatedImage src={it.optimizedURL} alt={`Gallery image ${it.index}`} />
 
-                  {/* Footer area */}
-                  <div className="p-3 h-14 flex items-center justify-between text-sm">
-                    <span className="text-gray-700">
-                      Index: <b>{it.index}</b>
-                    </span>
-                    <div className="flex items-center gap-2">
-                      {/* Replace */}
-                      <Button
-                        onClick={() => onReplaceClick(it)}
-                        disabled={itemBusy}
-                        loading={busyIds.has(it.id)}
-                        loadingText="Working…"
-                        variant="secondary"
-                        size="sm"
-                      >
-                        Replace
-                      </Button>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        hidden
-                        ref={(el) => (replaceInputRefs.current[it.id] = el)}
-                        onChange={(e) => {
-                          const f = e.target.files?.[0];
-                          e.target.value = "";
-                          if (f) onReplaceFile(it, f);
-                        }}
-                      />
-                      {/* Delete */}
-                      <Button
-                        onClick={() => onDelete(it)}
-                        disabled={itemBusy}
-                        loading={busyIds.has(it.id)}
-                        loadingText="Deleting…"
-                        variant="destructive"
-                        size="sm"
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                </motion.div>
+    {/* Index badge moved onto the image */}
+    <span className="absolute left-2 top-2 z-30 rounded-full bg-black/60 text-white text-xs px-2 py-1 leading-none">
+      #{it.index}
+    </span>
+  </div>
+
+  {/* Compact footer — no fixed height, less padding */}
+  <div className="px-3 py-2 flex items-center justify-end gap-2 text-sm">
+    <Button
+      onClick={() => onReplaceClick(it)}
+      disabled={busyIds.has(it.id) || isUploading}
+      loading={busyIds.has(it.id)}
+      loadingText="Working…"
+      variant="secondary"
+      size="sm"
+      className="h-8 px-3"
+    >
+      Replace
+    </Button>
+
+    <input
+      type="file"
+      accept="image/*"
+      hidden
+      ref={(el) => (replaceInputRefs.current[it.id] = el)}
+      onChange={(e) => {
+        const f = e.target.files?.[0];
+        e.target.value = "";
+        if (f) onReplaceFile(it, f);
+      }}
+    />
+
+    <Button
+      onClick={() => onDelete(it)}
+      disabled={busyIds.has(it.id) || isUploading}
+      loading={busyIds.has(it.id)}
+      loadingText="Deleting…"
+      variant="destructive"
+      size="sm"
+      className="h-8 px-3"
+    >
+      Delete
+    </Button>
+  </div>
+</motion.div>
+
               );
             })}
           </AnimatePresence>

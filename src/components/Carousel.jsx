@@ -1,7 +1,7 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import useWindowSize from "../hooks/useWindowSize";
 
-export default function Carousel({ headerHeight, images = [] }) {
+export default function Carousel({ headerHeight, images = [], intervalMs = 5000 }) {
   const [current, setCurrent] = useState(0);
   const [paused, setPaused] = useState(false);
   const { width } = useWindowSize();
@@ -9,27 +9,31 @@ export default function Carousel({ headerHeight, images = [] }) {
   const dynamicHeight = isMobile ? undefined : `calc(100vh - ${headerHeight}px)`;
 
   const intervalRef = useRef(null);
+  const containerRef = useRef(null);
 
+  // Auto-advance slides
   useEffect(() => {
+    clearInterval(intervalRef.current);
     if (!paused && images.length > 1) {
       intervalRef.current = setInterval(() => {
         setCurrent((prev) => (prev + 1) % images.length);
-      }, 5000);
+      }, intervalMs);
     }
-
     return () => clearInterval(intervalRef.current);
-  }, [paused, images.length]);
+  }, [paused, images.length, intervalMs]);
 
   if (!images.length) return null;
 
   return (
     <div
-      className={`relative w-full overflow-hidden ${
-        isMobile ? "aspect-video" : ""
-      }`}
+      ref={containerRef}
+      className={`relative w-full overflow-hidden ${isMobile ? "aspect-video" : ""}`}
       style={dynamicHeight ? { height: dynamicHeight } : {}}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
+      role="region"
+      aria-roledescription="carousel"
+      aria-label="Image carousel"
     >
       {images.map((src, index) => {
         const isActive = index === current;
@@ -41,12 +45,14 @@ export default function Carousel({ headerHeight, images = [] }) {
           <img
             key={index}
             src={src}
-            alt={`Slide ${index}`}
+            alt={`Slide ${index + 1}`}
             loading={isActive || isAdjacent ? "eager" : "lazy"}
-            className={`absolute inset-0 object-cover transform transition-all duration-1000 ease-in-out
-              ${isActive ? "opacity-100 translate-x-0 z-20" : "opacity-0 translate-x-5 z-10"}
-            `}
-            style={{ transitionTimingFunction: "ease-in-out" }}
+            decoding="async"
+            fetchPriority={isActive ? "high" : "auto"}
+            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-out
+              ${isActive ? "opacity-100 z-20" : "opacity-0 z-10"}
+            animated-zoom`}
+            style={{ willChange: "opacity, transform" }}
           />
         );
       })}
