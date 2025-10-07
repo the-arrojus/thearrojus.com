@@ -1,4 +1,7 @@
+// src/pages/.../Profile.jsx
 import { useEffect, useState, useMemo } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import Button from "../../components/Button"; // <-- adjust if your path differs
 import { useAuth } from "../../context/auth";
 import {
   updateProfile,
@@ -7,6 +10,30 @@ import {
   sendEmailVerification,
 } from "firebase/auth";
 import { CheckBadgeIcon } from "@heroicons/react/24/solid";
+
+function titleCaseName(str) {
+  return (str || "")
+    .trim()
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function OverlaySpinner({ show }) {
+  if (!show) return null;
+  return (
+    <div className="absolute inset-0 z-10 bg-white/40 backdrop-blur-[1px]">
+      <div className="absolute left-1/2 top-6 -translate-x-1/2">
+        <div className="flex items-center gap-2 text-gray-700">
+          <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" aria-hidden="true">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8v4a4 4 0 0 0-4 4H4z" />
+          </svg>
+          <span className="text-sm">Working…</span>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function Profile() {
   const { user, logout } = useAuth();
@@ -26,27 +53,70 @@ export default function Profile() {
   const [err, setErr] = useState(null);
   const [note, setNote] = useState(null);
 
+  const [initial, setInitial] = useState(null);
   const addrKey = useMemo(() => (user ? `profile_addr_${user.uid}` : null), [user]);
 
   useEffect(() => {
     if (!user) return;
+
     const displayName = user.displayName || "";
     const [fn, ...rest] = displayName.split(" ").filter(Boolean);
-    setFirstName(fn || "");
-    setLastName(rest.join(" ") || "");
-    setEmail(user.email || "");
+    const initFirst = fn || "";
+    const initLast = rest.join(" ") || "";
+    const initEmail = user.email || "";
+
+    let initStreet = "";
+    let initCity = "";
+    let initRegion = "";
+    let initPostal = "";
 
     try {
       const raw = addrKey && localStorage.getItem(addrKey);
       if (raw) {
         const a = JSON.parse(raw);
-        setStreet(a.street ?? "");
-        setCity(a.city ?? "");
-        setRegion(a.region ?? "");
-        setPostal(a.postal ?? "");
+        initStreet = a.street ?? "";
+        initCity = a.city ?? "";
+        initRegion = a.region ?? "";
+        initPostal = a.postal ?? "";
       }
     } catch {}
+
+    setFirstName(initFirst);
+    setLastName(initLast);
+    setEmail(initEmail);
+    setStreet(initStreet);
+    setCity(initCity);
+    setRegion(initRegion);
+    setPostal(initPostal);
+
+    setInitial({
+      firstName: initFirst,
+      lastName: initLast,
+      email: initEmail,
+      street: initStreet,
+      city: initCity,
+      region: initRegion,
+      postal: initPostal,
+    });
   }, [user, addrKey]);
+
+  const profileDirty = useMemo(() => {
+    if (!initial) return false;
+    return (
+      firstName !== initial.firstName ||
+      lastName !== initial.lastName ||
+      email !== initial.email ||
+      street !== initial.street ||
+      city !== initial.city ||
+      region !== initial.region ||
+      postal !== initial.postal
+    );
+  }, [firstName, lastName, email, street, city, region, postal, initial]);
+
+  const passwordsMatch = useMemo(
+    () => newPassword !== "" && confirmPassword !== "" && newPassword === confirmPassword,
+    [newPassword, confirmPassword]
+  );
 
   const saveProfile = async (e) => {
     e.preventDefault();
@@ -55,7 +125,12 @@ export default function Profile() {
     setNote(null);
     setBusy(true);
     try {
-      const displayName = [firstName, lastName].join(" ").trim() || null;
+      const cappedFirst = titleCaseName(firstName);
+      const cappedLast = titleCaseName(lastName);
+      setFirstName(cappedFirst);
+      setLastName(cappedLast);
+
+      const displayName = [cappedFirst, cappedLast].join(" ").trim() || null;
       await updateProfile(user, { displayName });
 
       if (email && email !== user.email) {
@@ -68,6 +143,16 @@ export default function Profile() {
       try {
         if (addrKey) localStorage.setItem(addrKey, JSON.stringify(payload));
       } catch {}
+
+      setInitial({
+        firstName: cappedFirst,
+        lastName: cappedLast,
+        email,
+        street,
+        city,
+        region,
+        postal,
+      });
 
       setNote("Profile updated.");
     } catch (e) {
@@ -124,13 +209,27 @@ export default function Profile() {
   if (!user) return null;
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 relative">
+      {/* Smooth overlay while busy */}
+      <AnimatePresence>
+        {busy && (
+          <motion.div
+            className="absolute inset-0 z-10"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <OverlaySpinner show />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">Profile</h1>
-        <button onClick={logout} className="rounded-xl px-4 py-2 bg-gray-900 text-white shadow">
+        <Button variant="outline" onClick={logout}>
           Sign out
-        </button>
+        </Button>
       </div>
 
       {/* --- Personal Information --- */}
@@ -147,43 +246,28 @@ export default function Profile() {
 
         <div className="grid max-w-2xl grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6 md:col-span-2">
           <div className="sm:col-span-3">
-            <label htmlFor="first-name" className="block text-sm/6 font-medium text-gray-900">
-              First name
-            </label>
-            <div className="mt-2">
-              <input
-                id="first-name"
-                type="text"
-                value={firstName}
-                onChange={(e) => setFirstName(e.target.value)}
-                className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 outline-gray-300 focus:outline-2 focus:outline-indigo-600"
-              />
-            </div>
+            <label className="block text-sm/6 font-medium text-gray-900">First name</label>
+            <input
+              value={firstName}
+              onChange={(e) => setFirstName(e.target.value)}
+              className="mt-2 block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 outline-gray-300 focus:outline-2 focus:outline-indigo-600"
+            />
           </div>
 
           <div className="sm:col-span-3">
-            <label htmlFor="last-name" className="block text-sm/6 font-medium text-gray-900">
-              Last name
-            </label>
-            <div className="mt-2">
-              <input
-                id="last-name"
-                type="text"
-                value={lastName}
-                onChange={(e) => setLastName(e.target.value)}
-                className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 outline-gray-300 focus:outline-2 focus:outline-indigo-600"
-              />
-            </div>
+            <label className="block text-sm/6 font-medium text-gray-900">Last name</label>
+            <input
+              value={lastName}
+              onChange={(e) => setLastName(e.target.value)}
+              className="mt-2 block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 outline-gray-300 focus:outline-2 focus:outline-indigo-600"
+            />
           </div>
 
           {/* Email with verified badge */}
           <div className="sm:col-span-4">
-            <label htmlFor="email" className="block text-sm/6 font-medium text-gray-900">
-              Email address
-            </label>
+            <label className="block text-sm/6 font-medium text-gray-900">Email address</label>
             <div className="mt-2 relative flex items-center">
               <input
-                id="email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -200,23 +284,22 @@ export default function Profile() {
 
           {/* Buttons */}
           <div className="col-span-full flex flex-wrap items-center gap-3">
-            <button
-              type="submit"
-              disabled={busy}
-              className="rounded-xl px-4 py-2 bg-indigo-600 text-white shadow disabled:opacity-60"
-            >
-              {busy ? "Saving…" : "Save profile"}
-            </button>
+            {profileDirty && (
+              <Button type="submit" loading={busy} loadingText="Saving…">
+                Save profile
+              </Button>
+            )}
 
             {!user?.emailVerified && (
-              <button
+              <Button
                 type="button"
                 onClick={sendVerificationEmail}
-                disabled={busy}
-                className="rounded-xl px-4 py-2 bg-green-600 text-white shadow disabled:opacity-60"
+                loading={busy}
+                variant="secondary"
+                loadingText="Sending…"
               >
-                {busy ? "Sending…" : "Send verification email"}
-              </button>
+                Send verification email
+              </Button>
             )}
           </div>
         </div>
@@ -236,45 +319,33 @@ export default function Profile() {
 
         <div className="grid max-w-2xl grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6 md:col-span-2">
           <div className="sm:col-span-3">
-            <label htmlFor="new-password" className="block text-sm/6 font-medium text-gray-900">
-              Password
-            </label>
-            <div className="mt-2">
-              <input
-                id="new-password"
-                type="password"
-                autoComplete="new-password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 outline-gray-300 focus:outline-2 focus:outline-indigo-600"
-              />
-            </div>
+            <label className="block text-sm/6 font-medium text-gray-900">Password</label>
+            <input
+              type="password"
+              autoComplete="new-password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="mt-2 block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 outline-gray-300 focus:outline-2 focus:outline-indigo-600"
+            />
           </div>
 
           <div className="sm:col-span-3">
-            <label htmlFor="confirm-password" className="block text-sm/6 font-medium text-gray-900">
-              Confirm password
-            </label>
-            <div className="mt-2">
-              <input
-                id="confirm-password"
-                type="password"
-                autoComplete="new-password"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 outline-gray-300 focus:outline-2 focus:outline-indigo-600"
-              />
-            </div>
+            <label className="block text-sm/6 font-medium text-gray-900">Confirm password</label>
+            <input
+              type="password"
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="mt-2 block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 outline-gray-300 focus:outline-2 focus:outline-indigo-600"
+            />
           </div>
 
           <div className="col-span-full">
-            <button
-              type="submit"
-              disabled={busy}
-              className="rounded-xl px-4 py-2 bg-indigo-600 text-white shadow disabled:opacity-60"
-            >
-              {busy ? "Updating…" : "Update password"}
-            </button>
+            {passwordsMatch && (
+              <Button type="submit" loading={busy} loadingText="Updating…">
+                Update password
+              </Button>
+            )}
           </div>
         </div>
       </form>

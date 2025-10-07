@@ -20,6 +20,7 @@ import {
   listAll,
 } from "firebase/storage";
 import { AnimatePresence, motion } from "framer-motion";
+import Button from "../../components/Button";
 
 /* -------------------- image tuning -------------------- */
 const OPT_MAX_DIM = 2400;     // gentler resize ceiling (was 1600)
@@ -333,12 +334,20 @@ export default function AdminCarousel() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Gallery</h1>
-        <label
-          className={`rounded-xl px-4 py-2 text-white shadow ${
-            canAdd && !isUploading ? "bg-indigo-600 cursor-pointer" : "bg-gray-400 cursor-not-allowed"
-          }`}
-          title={canAdd ? "Upload images" : "Gallery is full"}
-        >
+
+        {/* Upload Button (shadcn-style) */}
+        <div className="flex items-center gap-3">
+          <Button
+            onClick={() => uploadInputRef.current?.click()}
+            disabled={!canAdd}
+            loading={isUploading}
+            loadingText="Working…"
+            variant={canAdd ? "default" : "outline"}
+          >
+            {canAdd ? "Upload" : "Full"}
+          </Button>
+
+          {/* hidden file input used by the button above */}
           <input
             type="file"
             accept="image/*"
@@ -348,8 +357,7 @@ export default function AdminCarousel() {
             onChange={onPick}
             disabled={!canAdd || isUploading}
           />
-          {isUploading ? "Working…" : "Upload"}
-        </label>
+        </div>
       </div>
 
       {/* Single top upload progress bar */}
@@ -375,78 +383,82 @@ export default function AdminCarousel() {
         </div>
       )}
 
-      {/* Grid: only show when there are items (no empty CTAs) */}
+      {/* Grid: only show when there are items */}
       {items.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <AnimatePresence initial={false}>
-            {items.map((it) => (
-              <motion.div
-                key={it.id}
-                layout
-                initial={{ opacity: 0.6, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                className="rounded-xl border bg-white overflow-hidden flex flex-col"
-                draggable
-                onDragStart={() => !isUploading && onDragStart(it.id)}
-                onDragOver={(e) => !isUploading && onDragOver(e)}
-                onDrop={() => !isUploading && onDrop(it.id)}
-                title={isUploading ? "" : "Drag to reorder"}
-              >
-                {/* Media area (fixed aspect) */}
-                <div className="aspect-[4/3] w-full overflow-hidden">
-                  <img
-                    src={it.optimizedURL}
-                    alt=""
-                    className="w-full h-full object-cover"
-                    loading="lazy"
-                    draggable={false}
-                  />
-                </div>
-
-                {/* Footer area (fixed height so all cards match) */}
-                <div className="p-3 h-14 flex items-center justify-between text-sm">
-                  <span className="text-gray-700">
-                    Index: <b>{it.index}</b>
-                  </span>
-                  <div className="flex items-center gap-2">
-                    {/* Replace */}
-                    <button
-                      onClick={() => onReplaceClick(it)}
-                      disabled={busyIds.has(it.id) || isUploading}
-                      className={`rounded-lg px-3 py-1.5 text-white ${
-                        busyIds.has(it.id) || isUploading ? "bg-gray-400" : "bg-amber-600"
-                      }`}
-                      title="Replace image"
-                    >
-                      {busyIds.has(it.id) || isUploading ? "Working…" : "Replace"}
-                    </button>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      hidden
-                      ref={(el) => (replaceInputRefs.current[it.id] = el)}
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        e.target.value = "";
-                        if (f) onReplaceFile(it, f);
-                      }}
+            {items.map((it) => {
+              const itemBusy = busyIds.has(it.id) || isUploading;
+              return (
+                <motion.div
+                  key={it.id}
+                  layout
+                  initial={{ opacity: 0.6, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  className="rounded-xl border bg-white overflow-hidden flex flex-col"
+                  draggable
+                  onDragStart={() => !isUploading && onDragStart(it.id)}
+                  onDragOver={(e) => !isUploading && onDragOver(e)}
+                  onDrop={() => !isUploading && onDrop(it.id)}
+                  title={isUploading ? "" : "Drag to reorder"}
+                >
+                  {/* Media area (fixed aspect) */}
+                  <div className="aspect-[4/3] w-full overflow-hidden">
+                    <img
+                      src={it.optimizedURL}
+                      alt=""
+                      className="object-cover"
+                      loading="lazy"
+                      draggable={false}
                     />
-                    {/* Delete */}
-                    <button
-                      onClick={() => onDelete(it)}
-                      disabled={busyIds.has(it.id) || isUploading}
-                      className={`rounded-lg px-3 py-1.5 text-white ${
-                        busyIds.has(it.id) || isUploading ? "bg-gray-400" : "bg-red-600"
-                      }`}
-                    >
-                      {busyIds.has(it.id) || isUploading ? "Deleting…" : "Delete"}
-                    </button>
                   </div>
-                </div>
-              </motion.div>
-            ))}
+
+                  {/* Footer area */}
+                  <div className="p-3 h-14 flex items-center justify-between text-sm">
+                    <span className="text-gray-700">
+                      Index: <b>{it.index}</b>
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {/* Replace */}
+                      <Button
+                        onClick={() => onReplaceClick(it)}
+                        disabled={itemBusy}
+                        loading={busyIds.has(it.id)}
+                        loadingText="Working…"
+                        variant="secondary"
+                        size="sm"
+                      >
+                        Replace
+                      </Button>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        ref={(el) => (replaceInputRefs.current[it.id] = el)}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          e.target.value = "";
+                          if (f) onReplaceFile(it, f);
+                        }}
+                      />
+                      {/* Delete */}
+                      <Button
+                        onClick={() => onDelete(it)}
+                        disabled={itemBusy}
+                        loading={busyIds.has(it.id)}
+                        loadingText="Deleting…"
+                        variant="destructive"
+                        size="sm"
+                      >
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
         </div>
       )}

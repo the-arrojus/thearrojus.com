@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "../../context/auth";
 import { db } from "../../lib/firebase";
+import Button from "../../components/Button";
 import {
   collection,
   doc,
@@ -20,11 +21,21 @@ function makeToken() {
 }
 
 function InviteRow({ invite, status }) {
+  const [copied, setCopied] = useState(false);
+
   const link = `${window.location.origin}/t/${invite.token}`;
   const exp =
     invite.expiresAt instanceof Timestamp
       ? invite.expiresAt.toDate()
       : new Date(invite.expiresAt);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1200);
+    } catch {}
+  };
 
   return (
     <div className="rounded-xl border p-3 bg-white flex items-start justify-between gap-4">
@@ -32,7 +43,9 @@ function InviteRow({ invite, status }) {
         <div className="font-medium">{invite.clientName}</div>
         <div className="text-gray-700">{invite.event}</div>
         <div className="font-mono break-all text-gray-600">{link}</div>
-        <div className="text-xs text-gray-500">Expires: {exp.toLocaleString()}</div>
+        <div className="text-xs text-gray-500">
+          Expires: {exp.toLocaleString()}
+        </div>
         {status === "expired" && (
           <div className="text-xs font-medium text-orange-600">Expired</div>
         )}
@@ -48,14 +61,21 @@ function InviteRow({ invite, status }) {
               : "bg-orange-100 text-orange-700")
           }
         >
-          {status === "done" ? "Done" : status === "pending" ? "Pending" : "Expired"}
+          {status === "done"
+            ? "Done"
+            : status === "pending"
+            ? "Pending"
+            : "Expired"}
         </span>
-        <button
-          onClick={() => navigator.clipboard.writeText(link)}
-          className="rounded-lg px-3 py-1.5 bg-gray-900 text-white text-xs"
+
+        <Button
+          onClick={handleCopy}
+          size="sm"
+          variant="outline"
+          className="text-xs"
         >
-          Copy
-        </button>
+          {copied ? "Copied!" : "Copy"}
+        </Button>
       </div>
     </div>
   );
@@ -63,16 +83,13 @@ function InviteRow({ invite, status }) {
 
 export default function AdminTestimonials() {
   const { user } = useAuth();
-
   const [eventName, setEventName] = useState("");
   const [clientName, setClientName] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState(null);
+  const [invites, setInvites] = useState([]);
+  const [statuses, setStatuses] = useState({});
 
-  const [invites, setInvites] = useState([]); // raw invite docs
-  const [statuses, setStatuses] = useState({}); // token -> "pending" | "done" | "expired"
-
-  // Live list of invites for this admin
   useEffect(() => {
     if (!user) return;
     const q = query(
@@ -86,7 +103,6 @@ export default function AdminTestimonials() {
         const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         setInvites(rows);
 
-        // Compute statuses: check if testimonial/{token} exists OR expired
         const checks = await Promise.all(
           rows.map(async (r) => {
             const expMs =
@@ -113,13 +129,8 @@ export default function AdminTestimonials() {
   const createInvite = async (e) => {
     e.preventDefault();
     setErr(null);
-
-    if (!eventName.trim()) {
-      setErr("Event is required.");
-      return;
-    }
-    if (!clientName.trim()) {
-      setErr("Client full name is required.");
+    if (!eventName.trim() || !clientName.trim()) {
+      setErr("Event and Client name are required.");
       return;
     }
 
@@ -164,12 +175,11 @@ export default function AdminTestimonials() {
         <h1 className="text-3xl font-bold">Testimonials</h1>
       </div>
 
-      {/* --- Create Invite (Input Layouts style) --- */}
+      {/* --- Create Invite --- */}
       <form
         onSubmit={createInvite}
         className="grid grid-cols-1 gap-x-8 gap-y-10 border-b border-gray-900/10 pb-12 md:grid-cols-3"
       >
-        {/* Left column: section title + help text */}
         <div>
           <h2 className="text-base/7 font-semibold text-gray-900">Create Invite</h2>
           <p className="mt-1 text-sm/6 text-gray-600">
@@ -177,51 +187,35 @@ export default function AdminTestimonials() {
           </p>
         </div>
 
-        {/* Right column: inputs grid */}
         <div className="grid max-w-2xl grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6 md:col-span-2">
           <div className="sm:col-span-6">
-            <label className="block text-sm/6 font-medium text-gray-900" htmlFor="event">
-              Event *
-            </label>
-            <div className="mt-2">
-              <input
-                id="event"
-                type="text"
-                value={eventName}
-                onChange={(e) => setEventName(e.target.value)}
-                placeholder="e.g., Wedding of A & B"
-                required
-                className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 outline-gray-300 focus:outline-2 focus:outline-indigo-600"
-              />
-            </div>
+            <label className="block text-sm/6 font-medium text-gray-900">Event *</label>
+            <input
+              type="text"
+              value={eventName}
+              onChange={(e) => setEventName(e.target.value)}
+              placeholder="e.g., Wedding of A & B"
+              className="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-indigo-600"
+            />
           </div>
 
           <div className="sm:col-span-6">
-            <label className="block text-sm/6 font-medium text-gray-900" htmlFor="client">
+            <label className="block text-sm/6 font-medium text-gray-900">
               Client Full Name *
             </label>
-            <div className="mt-2">
-              <input
-                id="client"
-                type="text"
-                value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
-                placeholder="Jane Doe"
-                required
-                className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 outline-gray-300 focus:outline-2 focus:outline-indigo-600"
-              />
-            </div>
+            <input
+              type="text"
+              value={clientName}
+              onChange={(e) => setClientName(e.target.value)}
+              placeholder="Jane Doe"
+              className="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-indigo-600"
+            />
           </div>
 
-          {/* Action row */}
           <div className="col-span-full flex items-center gap-3">
-            <button
-              type="submit"
-              disabled={busy}
-              className="rounded-xl px-4 py-2 bg-indigo-600 text-white shadow disabled:opacity-60"
-            >
-              {busy ? "Generating…" : "Generate 24-hour link"}
-            </button>
+            <Button type="submit" loading={busy} loadingText="Generating…">
+              Generate 24-hour link
+            </Button>
             {err && <div className="text-sm text-red-600">{err}</div>}
           </div>
         </div>
@@ -258,7 +252,9 @@ export default function AdminTestimonials() {
       {/* --- Expired --- */}
       <section className="space-y-3">
         <details className="rounded-xl border p-3 bg-gray-50">
-          <summary className="cursor-pointer font-medium">Expired (no submission)</summary>
+          <summary className="cursor-pointer font-medium">
+            Expired (no submission)
+          </summary>
           <div className="mt-3 space-y-3">
             {invites
               .filter((i) => statuses[i.token] === "expired")

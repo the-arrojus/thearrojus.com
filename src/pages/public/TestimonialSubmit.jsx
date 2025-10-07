@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { db } from "../../lib/firebase.js";
 import { doc, getDoc, setDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 import FullScreenLoader from "../../components/FullScreenLoader";
+import Button from "../../components/Button"; // <-- shadcn-style button
 
 function StarInput({ value, onChange }) {
   return (
@@ -234,13 +235,14 @@ export default function TestimonialSubmit() {
 
           {/* Action Row */}
           <div className="col-span-full flex items-center gap-3">
-            <button
+            <Button
               type="submit"
-              disabled={submitting}
-              className="rounded-xl px-4 py-2 bg-indigo-600 text-white shadow disabled:opacity-60"
+              loading={submitting}
+              loadingText="Submitting…"
+              variant="default"
             >
-              {submitting ? "Submitting…" : "Submit"}
-            </button>
+              Submit
+            </Button>
             {error && <div className="text-sm text-red-600">{error}</div>}
           </div>
         </div>
