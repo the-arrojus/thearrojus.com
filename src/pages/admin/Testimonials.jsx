@@ -276,8 +276,27 @@ export default function AdminTestimonials() {
           <h2 className="text-base/7 font-semibold text-gray-900">Create Invite</h2>
           <p className="mt-1 text-sm/6 text-gray-600">Generate a 24-hour link for your client to submit their testimonial.</p>
         </div>
+        
+        
 
         <div className="grid max-w-2xl grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6 md:col-span-2">
+        
+          {/* Avatar uploader */}
+          <div className="sm:col-span-6">
+            <label className="block text-sm/6 font-medium text-gray-900">Client Avatar</label>
+            <div className="mt-2 flex items-center gap-4">
+              {avatarUrl ? (
+                <img src={avatarUrl} alt="avatar preview" className="h-16 w-16 rounded-full object-cover border" />
+              ) : (
+                <div className="h-16 w-16 rounded-full bg-gray-200" />
+              )}
+              <div className="flex items-center gap-3">
+                <input type="file" accept="image/*" onChange={handleChooseAvatar} />
+                {avatarUrl && <Button type="button" variant="outline" onClick={clearAvatar}>Remove</Button>}
+              </div>
+            </div>
+            <p className="mt-1 text-xs text-gray-500">Square crop is applied; images are public.</p>
+          </div>
           <div className="sm:col-span-6">
             <label className="block text-sm/6 font-medium text-gray-900">Event *</label>
             <input
@@ -295,6 +314,7 @@ export default function AdminTestimonials() {
               className="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-indigo-600"
             />
           </div>
+          
 
           {/* Event Date - Trigger & Full-Width Popover */}
           <div className="sm:col-span-3 relative">
@@ -408,23 +428,6 @@ export default function AdminTestimonials() {
               placeholder="Venue / City"
               className="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-indigo-600"
             />
-          </div>
-
-          {/* Avatar uploader */}
-          <div className="sm:col-span-6">
-            <label className="block text-sm/6 font-medium text-gray-900">Client Avatar</label>
-            <div className="mt-2 flex items-center gap-4">
-              {avatarUrl ? (
-                <img src={avatarUrl} alt="avatar preview" className="h-16 w-16 rounded-full object-cover border" />
-              ) : (
-                <div className="h-16 w-16 rounded-full bg-gray-200" />
-              )}
-              <div className="flex items-center gap-3">
-                <input type="file" accept="image/*" onChange={handleChooseAvatar} />
-                {avatarUrl && <Button type="button" variant="outline" onClick={clearAvatar}>Remove</Button>}
-              </div>
-            </div>
-            <p className="mt-1 text-xs text-gray-500">Square crop is applied; images are public.</p>
           </div>
 
           <div className="col-span-full flex items-center gap-3">
