@@ -141,6 +141,17 @@ export default function AdminTestimonials() {
     setViewMonth(d.getMonth());
   };
 
+  // NEW: center the calendar when it opens
+  useEffect(() => {
+    if (isCalOpen && calRef.current) {
+      calRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+        inline: "center",
+      });
+    }
+  }, [isCalOpen]);
+
   // Close on outside click / Esc
   useEffect(() => {
     if (!isCalOpen) return;
@@ -248,7 +259,7 @@ export default function AdminTestimonials() {
   };
 
   const pending = useMemo(() => invites.filter((i) => statuses[i.token] === "pending"), [invites, statuses]);
-  const done = useMemo(() => invites.filter((i) => statuses[i.token] === "done"), [invites, statuses]);
+  const done   = useMemo(() => invites.filter((i) => statuses[i.token] === "done"), [invites, statuses]);
 
   if (!user) return null;
 
