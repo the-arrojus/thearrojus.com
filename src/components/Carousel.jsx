@@ -43,7 +43,7 @@ export default function Carousel({ headerHeight, images = [] }) {
             src={src}
             alt={`Slide ${index}`}
             loading={isActive || isAdjacent ? "eager" : "lazy"}
-            className={`absolute inset-0 w-full h-full object-cover transform transition-all duration-1000 ease-in-out
+            className={`absolute inset-0 object-cover transform transition-all duration-1000 ease-in-out
               ${isActive ? "opacity-100 translate-x-0 z-20" : "opacity-0 translate-x-5 z-10"}
             `}
             style={{ transitionTimingFunction: "ease-in-out" }}

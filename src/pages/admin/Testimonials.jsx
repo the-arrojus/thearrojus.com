@@ -21,9 +21,10 @@ function makeToken() {
 
 function InviteRow({ invite, status }) {
   const link = `${window.location.origin}/t/${invite.token}`;
-  const exp = invite.expiresAt instanceof Timestamp
-    ? invite.expiresAt.toDate()
-    : new Date(invite.expiresAt);
+  const exp =
+    invite.expiresAt instanceof Timestamp
+      ? invite.expiresAt.toDate()
+      : new Date(invite.expiresAt);
 
   return (
     <div className="rounded-xl border p-3 bg-white flex items-start justify-between gap-4">
@@ -31,9 +32,7 @@ function InviteRow({ invite, status }) {
         <div className="font-medium">{invite.clientName}</div>
         <div className="text-gray-700">{invite.event}</div>
         <div className="font-mono break-all text-gray-600">{link}</div>
-        <div className="text-xs text-gray-500">
-          Expires: {exp.toLocaleString()}
-        </div>
+        <div className="text-xs text-gray-500">Expires: {exp.toLocaleString()}</div>
         {status === "expired" && (
           <div className="text-xs font-medium text-orange-600">Expired</div>
         )}
@@ -63,7 +62,7 @@ function InviteRow({ invite, status }) {
 }
 
 export default function AdminTestimonials() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
   const [eventName, setEventName] = useState("");
   const [clientName, setClientName] = useState("");
@@ -156,48 +155,79 @@ export default function AdminTestimonials() {
     [invites, statuses]
   );
 
+  if (!user) return null;
+
   return (
-    <div className="p-6 space-y-8 max-w-3xl">
+    <div className="space-y-8">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Testimonials — Admin</h1>
-        <button onClick={logout} className="rounded-xl px-4 py-2 bg-gray-900 text-white shadow">
-          Sign out
-        </button>
+        <h1 className="text-3xl font-bold">Testimonials</h1>
       </div>
 
-      {/* Create invite */}
-      <form onSubmit={createInvite} className="space-y-4 rounded-2xl border p-4 bg-gray-50">
+      {/* --- Create Invite (Input Layouts style) --- */}
+      <form
+        onSubmit={createInvite}
+        className="grid grid-cols-1 gap-x-8 gap-y-10 border-b border-gray-900/10 pb-12 md:grid-cols-3"
+      >
+        {/* Left column: section title + help text */}
         <div>
-          <label className="block text-sm font-medium text-gray-900 mb-1">Event *</label>
-          <input
-            className="w-full rounded-xl border px-3 py-2"
-            value={eventName}
-            onChange={(e) => setEventName(e.target.value)}
-            placeholder="e.g., Wedding of A & B"
-            required
-          />
+          <h2 className="text-base/7 font-semibold text-gray-900">Create Invite</h2>
+          <p className="mt-1 text-sm/6 text-gray-600">
+            Generate a 24-hour link for your client to submit their testimonial.
+          </p>
         </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-900 mb-1">Client Full Name *</label>
-          <input
-            className="w-full rounded-xl border px-3 py-2"
-            value={clientName}
-            onChange={(e) => setClientName(e.target.value)}
-            placeholder="Jane Doe"
-            required
-          />
+
+        {/* Right column: inputs grid */}
+        <div className="grid max-w-2xl grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6 md:col-span-2">
+          <div className="sm:col-span-6">
+            <label className="block text-sm/6 font-medium text-gray-900" htmlFor="event">
+              Event *
+            </label>
+            <div className="mt-2">
+              <input
+                id="event"
+                type="text"
+                value={eventName}
+                onChange={(e) => setEventName(e.target.value)}
+                placeholder="e.g., Wedding of A & B"
+                required
+                className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 outline-gray-300 focus:outline-2 focus:outline-indigo-600"
+              />
+            </div>
+          </div>
+
+          <div className="sm:col-span-6">
+            <label className="block text-sm/6 font-medium text-gray-900" htmlFor="client">
+              Client Full Name *
+            </label>
+            <div className="mt-2">
+              <input
+                id="client"
+                type="text"
+                value={clientName}
+                onChange={(e) => setClientName(e.target.value)}
+                placeholder="Jane Doe"
+                required
+                className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline outline-1 outline-gray-300 focus:outline-2 focus:outline-indigo-600"
+              />
+            </div>
+          </div>
+
+          {/* Action row */}
+          <div className="col-span-full flex items-center gap-3">
+            <button
+              type="submit"
+              disabled={busy}
+              className="rounded-xl px-4 py-2 bg-indigo-600 text-white shadow disabled:opacity-60"
+            >
+              {busy ? "Generating…" : "Generate 24-hour link"}
+            </button>
+            {err && <div className="text-sm text-red-600">{err}</div>}
+          </div>
         </div>
-        {err && <div className="text-sm text-red-600">{err}</div>}
-        <button
-          type="submit"
-          disabled={busy}
-          className="rounded-xl px-4 py-2 bg-indigo-600 text-white shadow disabled:opacity-60"
-        >
-          {busy ? "Generating…" : "Generate 24-hour link"}
-        </button>
       </form>
 
-      {/* Pending */}
+      {/* --- Pending --- */}
       <section className="space-y-3">
         <h2 className="text-xl font-semibold">Pending</h2>
         {pending.length === 0 ? (
@@ -211,7 +241,7 @@ export default function AdminTestimonials() {
         )}
       </section>
 
-      {/* Done */}
+      {/* --- Done --- */}
       <section className="space-y-3">
         <h2 className="text-xl font-semibold">Done</h2>
         {done.length === 0 ? (
@@ -225,7 +255,7 @@ export default function AdminTestimonials() {
         )}
       </section>
 
-      {/* Expired but unused (optional) */}
+      {/* --- Expired --- */}
       <section className="space-y-3">
         <details className="rounded-xl border p-3 bg-gray-50">
           <summary className="cursor-pointer font-medium">Expired (no submission)</summary>
