@@ -49,7 +49,7 @@ export default function Carousel({ headerHeight, images = [], intervalMs = 5000 
             loading={isActive || isAdjacent ? "eager" : "lazy"}
             decoding="async"
             fetchPriority={isActive ? "high" : "auto"}
-            className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ease-out
+            className={`absolute inset-0 object-cover transition-opacity duration-700 ease-out
               ${isActive ? "opacity-100 z-20" : "opacity-0 z-10"}
             animated-zoom`}
             style={{ willChange: "opacity, transform" }}
