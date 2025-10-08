@@ -148,11 +148,6 @@ function InviteRow({ invite, status, onToast }) {
           "translateZ(0) perspective(1000px) rotateX(var(--tiltX, 0deg)) rotateY(var(--tiltY, 0deg))"
       }}
     >
-      {/* Shine sweep on hover */}
-      <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
-        <span className="absolute -inset-y-12 -left-1/2 w-2/3 rotate-12 opacity-0 bg-gradient-to-r from-transparent via-white/30 to-transparent blur-md transition-opacity duration-500 group-hover:opacity-100" />
-      </span>
-
       {/* Top section */}
       <div className="flex w-full items-center justify-between space-x-6 p-6">
         <div className="flex-1 min-w-0">
@@ -188,7 +183,7 @@ function InviteRow({ invite, status, onToast }) {
               onClick={handleOpenMap}
               disabled={!invite.eventPlace}
               className={classNames(
-                "relative -mr-px inline-flex w-0 flex-1 items-center justify-center gap-x-2 rounded-bl-xl border border-transparent py-3 text-sm font-semibold transition-all duration-200",
+                "group/location relative -mr-px inline-flex w-0 flex-1 items-center justify-center gap-x-2 rounded-bl-xl border border-transparent py-3 text-sm font-semibold transition-all duration-200",
                 invite.eventPlace
                   ? "text-gray-900 hover:bg-gray-50 active:scale-[0.99]"
                   : "cursor-not-allowed text-gray-400"
@@ -198,58 +193,95 @@ function InviteRow({ invite, status, onToast }) {
                 aria-hidden="true"
                 className="size-5 text-gray-400 transition-transform duration-200 group-hover:translate-y-[-1px]"
               />
-              <span className="truncate relative">
-                {invite.eventPlace || "Location not set"}
-                {/* underline appears only on hover */}
-                {invite.eventPlace && (
-                  <span className="absolute left-0 right-0 bottom-[-2px] mx-auto h-[1px] bg-gradient-to-r from-transparent via-gray-300 to-transparent scale-x-0 origin-center transition-transform duration-300 hover:scale-x-100" />
-                )}
-              </span>
+              <span className="truncate">{invite.eventPlace || "Location not set"}</span>
+
+              {/* underline only on hover */}
+              {invite.eventPlace && (
+                <span className="pointer-events-none absolute inset-x-6 bottom-2 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent transform scale-x-0 origin-center transition-transform duration-300 group-hover/location:scale-x-100" />
+              )}
             </button>
           </div>
 
-          {/* Copy Link */}
-          <div className="-ml-px flex w-0 flex-1">
+          {/* Copy Link — enhanced with green success effects */}
+          <div className="-ml-px flex w-0 flex-1 relative">
+            {/* success halo (appears only when copied) */}
+            {copied && (
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute inset-0 rounded-br-xl bg-green-300/30 animate-ping"
+              />
+            )}
+
             <button
               type="button"
               onClick={handleCopy}
               className={classNames(
-                "relative inline-flex w-0 flex-1 items-center justify-center gap-x-2 rounded-br-xl border border-transparent py-3 text-sm font-semibold text-gray-900 transition-all duration-200",
-                "hover:bg-gray-50 active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-2"
+                "group/copy relative inline-flex w-0 flex-1 items-center justify-center gap-x-2 rounded-br-xl border border-transparent py-3 text-sm font-semibold transition-all duration-200 focus:outline-none",
+                "hover:bg-gray-50 active:scale-[0.99]",
+                copied
+                  ? // when copied, go green and lift a bit
+                    "bg-green-50 text-green-700 ring-1 ring-green-200 translate-y-[-1px]"
+                  : "text-gray-900"
               )}
               aria-live="polite"
             >
-              <svg
-                aria-hidden="true"
-                className={classNames(
-                  "size-5 text-gray-400 transition-transform duration-200",
-                  copied ? "scale-110" : ""
-                )}
-                viewBox="0 0 24 24"
-                fill="currentColor"
-              >
-                <path d="M7 7a3 3 0 0 1 3-3h7a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3h-1v-2h1a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-7a1 1 0 0 0-1 1v1H7V7Zm-3 5a3 3 0 0 1 3-3h7a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-7Zm3-1a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1v-7a1 1 0 0 0-1-1H7Z" />
-              </svg>
-              <span className={classNames(copied ? "animate-pulse" : "", "relative")}>
-                {copied ? "Copied!" : "Copy Link"}
-                {/* underline only on hover */}
-                <span className="absolute left-0 right-0 bottom-[-2px] mx-auto h-[1px] bg-gradient-to-r from-transparent via-gray-300 to-transparent scale-x-0 origin-center transition-transform duration-300 hover:scale-x-100" />
-              </span>
+              {/* icon swap: clipboard -> check badge */}
+              {copied ? (
+                <svg
+                  aria-hidden="true"
+                  className="size-5 text-green-500 transition-transform duration-300 scale-110 rotate-[8deg]"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  {/* check-circle icon */}
+                  <path d="M12 2a10 10 0 1 0 .001 20.001A10 10 0 0 0 12 2Zm4.28 7.22a1 1 0 0 1 0 1.41l-5 5a1 1 0 0 1-1.41 0l-2-2a1 1 0 1 1 1.41-1.41l1.29 1.29 4.3-4.3a1 1 0 0 1 1.41 0Z" />
+                </svg>
+              ) : (
+                <svg
+                  aria-hidden="true"
+                  className="size-5 text-gray-400 transition-transform duration-200"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                >
+                  <path d="M7 7a3 3 0 0 1 3-3h7a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3h-1v-2h1a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-7a1 1 0 0 0-1 1v1H7V7Zm-3 5a3 3 0 0 1 3-3h7a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-7Zm3-1a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1v-7a1 1 0 0 0-1-1H7Z" />
+                </svg>
+              )}
 
-              {/* success glow */}
               <span
                 className={classNames(
-                  "pointer-events-none absolute inset-0 rounded-br-xl ring-2 ring-green-400/0 transition",
-                  copied ? "ring-green-400/60" : ""
+                  "transition-transform",
+                  copied ? "animate-pulse" : ""
+                )}
+              >
+                {copied ? "Copied!" : "Copy Link"}
+              </span>
+
+              {/* underline only on hover; turns green on success */}
+              <span
+                className={classNames(
+                  "pointer-events-none absolute inset-x-6 bottom-2 h-px transform scale-x-0 origin-center transition-transform duration-300 group-hover/copy:scale-x-100",
+                  copied
+                    ? "bg-gradient-to-r from-transparent via-green-500 to-transparent"
+                    : "bg-gradient-to-r from-transparent via-gray-400 to-transparent"
                 )}
               />
+
+              {/* confetti spark — tiny star that pops on success */}
+              {copied && (
+                <span
+                  aria-hidden="true"
+                  className="absolute -top-1 right-6 text-green-500 animate-bounce"
+                >
+                  {/* little 4-point star */}
+                  <svg viewBox="0 0 24 24" className="size-4" fill="currentColor">
+                    <path d="M12 2l1.8 4.2L18 8l-4.2 1.8L12 14l-1.8-4.2L6 8l4.2-1.8L12 2z" />
+                  </svg>
+                </span>
+              )}
             </button>
           </div>
         </div>
       </div>
-
-      {/* Gradient border (slightly more visible) */}
-      <span className="pointer-events-none absolute -inset-px rounded-[13px] opacity-100 blur-[8px] transition duration-300 group-hover:opacity-100" />
     </div>
   );
 }
