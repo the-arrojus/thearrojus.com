@@ -87,7 +87,20 @@ const MotionButton = motion.button;
 /* ---------------- InviteRow (Card UI) ---------------- */
 function InviteRow({ invite, status, onToast }) {
   const [copied, setCopied] = useState(false);
+  const [visible, setVisible] = useState(false);
+  const cardRef = useRef(null);
   const link = `${window.location.origin}/t/${invite.token}`;
+
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => entry.isIntersecting && setVisible(true),
+      { threshold: 0.16 }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
 
   const handleCopy = async () => {
     try {
@@ -107,11 +120,43 @@ function InviteRow({ invite, status, onToast }) {
   };
 
   return (
-    <div className="col-span-1 divide-y divide-gray-200 rounded-lg bg-white shadow-sm">
+    <div
+      ref={cardRef}
+      className={classNames(
+        "group relative col-span-1 divide-y divide-gray-100 rounded-xl bg-white shadow-lg border border-gray-200",
+        "transition-all duration-300 ease-out will-change-transform",
+        "hover:shadow-2xl hover:-translate-y-0.5 hover:rotate-[0.15deg]",
+        "focus-within:shadow-2xl focus-within:-translate-y-0.5",
+        visible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-3"
+      )}
+      onMouseMove={(e) => {
+        const r = cardRef.current?.getBoundingClientRect();
+        if (!r) return;
+        const px = (e.clientX - r.left) / r.width - 0.5;
+        const py = (e.clientY - r.top) / r.height - 0.5;
+        cardRef.current.style.setProperty("--tiltX", `${py * -2}deg`);
+        cardRef.current.style.setProperty("--tiltY", `${px * 2}deg`);
+      }}
+      onMouseLeave={() => {
+        if (cardRef.current) {
+          cardRef.current.style.setProperty("--tiltX", `0deg`);
+          cardRef.current.style.setProperty("--tiltY", `0deg`);
+        }
+      }}
+      style={{
+        transform:
+          "translateZ(0) perspective(1000px) rotateX(var(--tiltX, 0deg)) rotateY(var(--tiltY, 0deg))"
+      }}
+    >
+      {/* Shine sweep on hover */}
+      <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-xl">
+        <span className="absolute -inset-y-12 -left-1/2 w-2/3 rotate-12 opacity-0 bg-gradient-to-r from-transparent via-white/30 to-transparent blur-md transition-opacity duration-500 group-hover:opacity-100" />
+      </span>
+
       {/* Top section */}
       <div className="flex w-full items-center justify-between space-x-6 p-6">
         <div className="flex-1 min-w-0">
-          <h3 className="truncate text-sm font-medium text-gray-900">
+          <h3 className="truncate text-sm font-semibold text-gray-900 tracking-tight">
             {invite.clientName || "Unknown Client"}
           </h3>
           <p className="mt-1 truncate text-sm text-gray-500">
@@ -123,59 +168,88 @@ function InviteRow({ invite, status, onToast }) {
           <img
             alt={`${invite.clientName || "Client"} avatar`}
             src={invite.avatarUrl}
-            className="size-12 shrink-0 rounded-full object-cover bg-gray-300"
+            className="size-12 shrink-0 rounded-full object-cover bg-gray-300 ring-1 ring-black/5 transition-transform duration-500 group-hover:scale-150"
             loading="lazy"
           />
         ) : (
-          <div className="size-12 shrink-0 rounded-full bg-gray-200 grid place-items-center text-sm text-gray-500 outline -outline-offset-1 outline-black/5">
+          <div className="size-12 shrink-0 rounded-full bg-gray-200 grid place-items-center text-sm text-gray-600 outline -outline-offset-1 outline-black/5 ring-1 ring-black/5 transition-transform duration-500 group-hover:scale-150">
             {invite.clientName?.[0] || "?"}
           </div>
         )}
       </div>
 
-      {/* Bottom row: Location (left) + Copy Link (right) */}
+      {/* Bottom row: Location + Copy Link */}
       <div>
         <div className="-mt-px flex divide-x divide-gray-200">
-          {/* Location button (opens Google Maps) */}
+          {/* Location button */}
           <div className="flex w-0 flex-1">
             <button
               type="button"
               onClick={handleOpenMap}
               disabled={!invite.eventPlace}
               className={classNames(
-                "relative -mr-px inline-flex w-0 flex-1 items-center justify-center gap-x-2 rounded-bl-lg border border-transparent py-3 text-sm font-semibold text-gray-900 transition",
+                "relative -mr-px inline-flex w-0 flex-1 items-center justify-center gap-x-2 rounded-bl-xl border border-transparent py-3 text-sm font-semibold transition-all duration-200",
                 invite.eventPlace
-                  ? "hover:bg-gray-50 cursor-pointer"
+                  ? "text-gray-900 hover:bg-gray-50 active:scale-[0.99]"
                   : "cursor-not-allowed text-gray-400"
               )}
             >
-              <MapPinIcon aria-hidden="true" className="size-5 text-gray-400" />
-              <span className="truncate">
+              <MapPinIcon
+                aria-hidden="true"
+                className="size-5 text-gray-400 transition-transform duration-200 group-hover:translate-y-[-1px]"
+              />
+              <span className="truncate relative">
                 {invite.eventPlace || "Location not set"}
+                {/* underline appears only on hover */}
+                {invite.eventPlace && (
+                  <span className="absolute left-0 right-0 bottom-[-2px] mx-auto h-[1px] bg-gradient-to-r from-transparent via-gray-300 to-transparent scale-x-0 origin-center transition-transform duration-300 hover:scale-x-100" />
+                )}
               </span>
             </button>
           </div>
 
-          {/* Copy link */}
+          {/* Copy Link */}
           <div className="-ml-px flex w-0 flex-1">
             <button
               type="button"
               onClick={handleCopy}
-              className="relative inline-flex w-0 flex-1 items-center justify-center gap-x-2 rounded-br-lg border border-transparent py-3 text-sm font-semibold text-gray-900 hover:bg-gray-50 cursor-pointer"
+              className={classNames(
+                "relative inline-flex w-0 flex-1 items-center justify-center gap-x-2 rounded-br-xl border border-transparent py-3 text-sm font-semibold text-gray-900 transition-all duration-200",
+                "hover:bg-gray-50 active:scale-[0.99] focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-2"
+              )}
+              aria-live="polite"
             >
               <svg
                 aria-hidden="true"
-                className="size-5 text-gray-400"
+                className={classNames(
+                  "size-5 text-gray-400 transition-transform duration-200",
+                  copied ? "scale-110" : ""
+                )}
                 viewBox="0 0 24 24"
                 fill="currentColor"
               >
                 <path d="M7 7a3 3 0 0 1 3-3h7a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3h-1v-2h1a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-7a1 1 0 0 0-1 1v1H7V7Zm-3 5a3 3 0 0 1 3-3h7a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-7Zm3-1a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1v-7a1 1 0 0 0-1-1H7Z" />
               </svg>
-              {copied ? "Copied!" : "Copy Link"}
+              <span className={classNames(copied ? "animate-pulse" : "", "relative")}>
+                {copied ? "Copied!" : "Copy Link"}
+                {/* underline only on hover */}
+                <span className="absolute left-0 right-0 bottom-[-2px] mx-auto h-[1px] bg-gradient-to-r from-transparent via-gray-300 to-transparent scale-x-0 origin-center transition-transform duration-300 hover:scale-x-100" />
+              </span>
+
+              {/* success glow */}
+              <span
+                className={classNames(
+                  "pointer-events-none absolute inset-0 rounded-br-xl ring-2 ring-green-400/0 transition",
+                  copied ? "ring-green-400/60" : ""
+                )}
+              />
             </button>
           </div>
         </div>
       </div>
+
+      {/* Gradient border (slightly more visible) */}
+      <span className="pointer-events-none absolute -inset-px rounded-[13px] opacity-100 blur-[8px] transition duration-300 group-hover:opacity-100" />
     </div>
   );
 }
