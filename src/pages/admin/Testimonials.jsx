@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { motion, useReducedMotion } from "framer-motion"; // animations
 import { useAuth } from "../../context/auth";
 import { db, storage } from "../../lib/firebase";
 import Button from "../../components/Button";
@@ -80,6 +81,9 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(" ");
 }
 
+/* ---------- Framer Motion button wrapper (like MotionLink) ---------- */
+const MotionButton = motion.button;
+
 /* ---------------- InviteRow (Card UI) ---------------- */
 function InviteRow({ invite, status, onToast }) {
   const [copied, setCopied] = useState(false);
@@ -107,17 +111,14 @@ function InviteRow({ invite, status, onToast }) {
       {/* Top section */}
       <div className="flex w-full items-center justify-between space-x-6 p-6">
         <div className="flex-1 min-w-0">
-          {/* Name */}
           <h3 className="truncate text-sm font-medium text-gray-900">
             {invite.clientName || "Unknown Client"}
           </h3>
-          {/* Event */}
           <p className="mt-1 truncate text-sm text-gray-500">
             {invite.event || "Untitled Event"}
           </p>
         </div>
 
-        {/* Avatar */}
         {invite.avatarUrl ? (
           <img
             alt={`${invite.clientName || "Client"} avatar`}
@@ -178,8 +179,6 @@ function InviteRow({ invite, status, onToast }) {
     </div>
   );
 }
-
-
 
 /* ---------------- Main Component ---------------- */
 export default function AdminTestimonials() {
@@ -284,13 +283,13 @@ export default function AdminTestimonials() {
   // Live invites + statuses
   useEffect(() => {
     if (!user) return;
-    const q = query(
+    const qry = query(
       collection(db, "testimonialInvites"),
       where("adminUid", "==", user.uid),
       orderBy("createdAt", "desc")
     );
     const unsub = onSnapshot(
-      q,
+      qry,
       async (snap) => {
         const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
         setInvites(rows);
@@ -318,7 +317,6 @@ export default function AdminTestimonials() {
         showToast(e?.message || "Failed to load invites", "error");
       }
     );
-    return () => unsub();
   }, [user, showToast]);
 
   const ensureToken = () => {
@@ -415,9 +413,7 @@ export default function AdminTestimonials() {
     try {
       const token = ensureToken();
       const expiresAt = Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000);
-      const eventDateTs = eventDate
-        ? Timestamp.fromDate(new Date(eventDate))
-        : null;
+      const eventDateTs = eventDate ? Timestamp.fromDate(new Date(eventDate)) : null;
 
       await setDoc(doc(db, "testimonialInvites", token), {
         token,
@@ -442,9 +438,9 @@ export default function AdminTestimonials() {
       closeCalendar();
 
       showToast("Invite created. Link expires in 24 hours.");
-    } catch (e) {
-      setErr(e?.message || "Failed to create invite");
-      showToast(e?.message || "Failed to create invite", "error");
+    } catch (e2) {
+      setErr(e2?.message || "Failed to create invite");
+      showToast(e2?.message || "Failed to create invite", "error");
     } finally {
       setBusy(false);
     }
@@ -465,6 +461,11 @@ export default function AdminTestimonials() {
 
   // Tabs: 'pending' | 'done' | 'expired'
   const [activeTab, setActiveTab] = useState("pending");
+
+  // Respect OS reduced-motion setting — mirrors AdminHeader behavior
+  const prefersReducedMotion = useReducedMotion();
+  const hoverScale = prefersReducedMotion ? 1 : 1.05;
+  const tapScale = prefersReducedMotion ? 1 : 0.97;
 
   if (!user) return null;
 
@@ -501,10 +502,7 @@ export default function AdminTestimonials() {
                   className="size-12 rounded-full object-cover border"
                 />
               ) : (
-                <UserCircleIcon
-                  aria-hidden="true"
-                  className="size-12 text-gray-300"
-                />
+                <UserCircleIcon aria-hidden="true" className="size-12 text-gray-300" />
               )}
 
               {/* Hidden input triggered by the Change button */}
@@ -592,10 +590,7 @@ export default function AdminTestimonials() {
                       })
                     : "Select date"}
                 </span>
-                <CalendarDaysIcon
-                  className="size-5 text-gray-400"
-                  aria-hidden="true"
-                />
+                <CalendarDaysIcon className="size-5 text-gray-400" aria-hidden="true" />
               </button>
             </div>
 
@@ -676,10 +671,11 @@ export default function AdminTestimonials() {
                   <div className="mt-4 flex items-center justify-between border-t pt-3 text-xs text-gray-600">
                     <span>
                       {eventDate
-                        ? `Selected: ${new Date(eventDate).toLocaleDateString(
-                            undefined,
-                            { year: "numeric", month: "long", day: "numeric" }
-                          )}`
+                        ? `Selected: ${new Date(eventDate).toLocaleDateString(undefined, {
+                            year: "numeric",
+                            month: "long",
+                            day: "numeric",
+                          })}`
                         : "No date selected"}
                     </span>
                     <button
@@ -748,9 +744,7 @@ export default function AdminTestimonials() {
               />
             </div>
 
-            <p className="mt-1 text-xs text-gray-500 sm:hidden">
-              Press Tab to autocomplete.
-            </p>
+            <p className="mt-1 text-xs text-gray-500 sm:hidden">Press Tab to autocomplete.</p>
           </div>
 
           <div className="col-span-full flex items-center gap-3">
@@ -790,7 +784,7 @@ export default function AdminTestimonials() {
             />
           </div>
 
-          {/* Desktop: tabs with icons */}
+          {/* Desktop: tabs with icons (animated like AdminHeader) */}
           <div className="hidden sm:block">
             <nav
               aria-label="Tabs"
@@ -804,11 +798,14 @@ export default function AdminTestimonials() {
                 const current = activeTab === tab.key;
                 const Icon = tab.icon;
                 return (
-                  <button
+                  <MotionButton
                     key={tab.key}
                     type="button"
                     onClick={() => setActiveTab(tab.key)}
                     aria-current={current ? "page" : undefined}
+                    whileHover={{ scale: hoverScale }}
+                    whileTap={{ scale: tapScale }}
+                    transition={{ type: "spring", stiffness: 350, damping: 22 }}
                     className={classNames(
                       current ? "text-gray-900" : "text-gray-500 hover:text-gray-700",
                       idx === 0 ? "rounded-l-lg" : "",
@@ -833,7 +830,7 @@ export default function AdminTestimonials() {
                         "absolute inset-x-0 bottom-0 h-0.5"
                       )}
                     />
-                  </button>
+                  </MotionButton>
                 );
               })}
             </nav>
@@ -848,12 +845,7 @@ export default function AdminTestimonials() {
             ) : (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {pending.map((inv) => (
-                  <InviteRow
-                    key={inv.token}
-                    invite={inv}
-                    status="pending"
-                    onToast={showToast}
-                  />
+                  <InviteRow key={inv.token} invite={inv} status="pending" onToast={showToast} />
                 ))}
               </div>
             )}
@@ -863,18 +855,11 @@ export default function AdminTestimonials() {
         {activeTab === "done" && (
           <div className="space-y-3">
             {done.length === 0 ? (
-              <div className="text-sm text-gray-500">
-                No completed testimonials yet.
-              </div>
+              <div className="text-sm text-gray-500">No completed testimonials yet.</div>
             ) : (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {done.map((inv) => (
-                  <InviteRow
-                    key={inv.token}
-                    invite={inv}
-                    status="done"
-                    onToast={showToast}
-                  />
+                  <InviteRow key={inv.token} invite={inv} status="done" onToast={showToast} />
                 ))}
               </div>
             )}
@@ -888,12 +873,7 @@ export default function AdminTestimonials() {
             ) : (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {expired.map((inv) => (
-                  <InviteRow
-                    key={inv.token}
-                    invite={inv}
-                    status="expired"
-                    onToast={showToast}
-                  />
+                  <InviteRow key={inv.token} invite={inv} status="expired" onToast={showToast} />
                 ))}
               </div>
             )}
