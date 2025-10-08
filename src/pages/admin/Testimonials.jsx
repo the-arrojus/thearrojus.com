@@ -9,7 +9,13 @@ import {
   serverTimestamp, setDoc, Timestamp, where,
 } from "firebase/firestore";
 import { getDownloadURL, ref, uploadBytes, deleteObject } from "firebase/storage";
-import { ChevronLeftIcon, ChevronRightIcon, CalendarDaysIcon, XMarkIcon } from "@heroicons/react/20/solid";
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  CalendarDaysIcon,
+  XMarkIcon,
+} from "@heroicons/react/20/solid";
+import { UserCircleIcon } from "@heroicons/react/24/solid";
 
 function makeToken() { return crypto.randomUUID().replace(/-/g, ""); }
 
@@ -109,6 +115,9 @@ export default function AdminTestimonials() {
   const [isCalOpen, setIsCalOpen] = useState(false);
   const calRef = useRef(null);
   const anchorRef = useRef(null);
+
+  // NEW: ref for hidden avatar file input (used by "Change" button)
+  const avatarInputRef = useRef(null);
 
   // Month view follows selected date (or today)
   const base = eventDate ? new Date(eventDate) : new Date();
@@ -215,6 +224,8 @@ export default function AdminTestimonials() {
     if (!file) return;
     setRawAvatarFile(file);
     setShowCropper(true);
+    // reset the input so selecting the same file again re-triggers onChange
+    e.target.value = "";
   };
 
   const uploadAvatarBlob = async (blob, token) => {
@@ -276,27 +287,54 @@ export default function AdminTestimonials() {
           <h2 className="text-base/7 font-semibold text-gray-900">Create Invite</h2>
           <p className="mt-1 text-sm/6 text-gray-600">Generate a 24-hour link for your client to submit their testimonial.</p>
         </div>
-        
-        
 
         <div className="grid max-w-2xl grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6 md:col-span-2">
-        
-          {/* Avatar uploader */}
+
+          {/* Avatar uploader — updated to use the "Photo" + UserCircleIcon + Change button UI */}
           <div className="sm:col-span-6">
-            <label className="block text-sm/6 font-medium text-gray-900">Client Avatar</label>
-            <div className="mt-2 flex items-center gap-4">
+            <label className="block text-sm/6 font-medium text-gray-900">Photo</label>
+            <div className="mt-2 flex items-center gap-x-3">
               {avatarUrl ? (
-                <img src={avatarUrl} alt="avatar preview" className="h-16 w-16 rounded-full object-cover border" />
+                <img
+                  src={avatarUrl}
+                  alt="avatar preview"
+                  className="size-12 rounded-full object-cover border"
+                />
               ) : (
-                <div className="h-16 w-16 rounded-full bg-gray-200" />
+                <UserCircleIcon aria-hidden="true" className="size-12 text-gray-300" />
               )}
-              <div className="flex items-center gap-3">
-                <input type="file" accept="image/*" onChange={handleChooseAvatar} />
-                {avatarUrl && <Button type="button" variant="outline" onClick={clearAvatar}>Remove</Button>}
-              </div>
+
+              {/* Hidden input triggered by the Change button */}
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                onChange={handleChooseAvatar}
+              />
+
+              <button
+                type="button"
+                onClick={() => avatarInputRef.current?.click()}
+                className="rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-xs inset-ring inset-ring-gray-300 hover:bg-gray-50"
+              >
+                Change
+              </button>
+
+              {/* Optional: allow removing the current avatar if one is set */}
+              {avatarUrl && (
+                <button
+                  type="button"
+                  onClick={clearAvatar}
+                  className="text-sm text-gray-700 underline"
+                >
+                  Remove
+                </button>
+              )}
             </div>
             <p className="mt-1 text-xs text-gray-500">Square crop is applied; images are public.</p>
           </div>
+
           <div className="sm:col-span-6">
             <label className="block text-sm/6 font-medium text-gray-900">Event *</label>
             <input
@@ -314,7 +352,6 @@ export default function AdminTestimonials() {
               className="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-indigo-600"
             />
           </div>
-          
 
           {/* Event Date - Trigger & Full-Width Popover */}
           <div className="sm:col-span-3 relative">
