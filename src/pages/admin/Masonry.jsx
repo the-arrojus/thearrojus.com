@@ -119,10 +119,10 @@ function usePrefersReducedMotion() {
 }
 
 /* ---------- Animated image (with badge) ---------- */
-function MasonryAnimatedImage({ src, alt = "", badgeContent }) {
+function MasonryAnimatedImage({ src, alt = "", badgeContent, containerClassName = "" }) {
   const reduce = usePrefersReducedMotion();
   return (
-    <div className="relative grid [grid-template-areas:_'stack'] overflow-hidden">
+    <div className={`relative grid [grid-template-areas:_'stack'] overflow-hidden ${containerClassName}`}>
       {badgeContent && (
         <span className="absolute left-2 top-2 z-30 rounded-full bg-black/60 text-white text-xs px-2 py-1 leading-none">
           {badgeContent}
@@ -167,7 +167,7 @@ export default function Masonry() {
 
   const dragAuto = useRef({ active: false, y: 0, raf: 0, cleanup: null });
 
-  // 👇 show coachmark briefly when there are 2+ items
+  // brief coachmark when there are 2+ items
   const [showCoach] = useAutoCoachmark(items.length >= 2, 2400);
 
   useEffect(() => {
@@ -365,6 +365,121 @@ export default function Masonry() {
 
   return (
     <div ref={containerRef} className="space-y-8">
+      <style>{`
+  .card {
+    position: relative;
+    transition:
+      transform 220ms cubic-bezier(.2,.8,.2,1),
+      box-shadow 220ms ease,
+      border-color 220ms ease,
+      filter 220ms ease;
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 0.75rem; /* rounded-xl */
+    background: white;
+    will-change: transform, box-shadow, filter;
+  }
+
+  .card:hover {
+    transform: translateY(-2px) scale(1.01);
+    box-shadow:
+      0 14px 30px rgba(0,0,0,.10),
+      0 3px 10px rgba(0,0,0,.08);
+  }
+
+  .card:active {
+    transform: translateY(0) scale(0.997);
+    cursor: grabbing;
+    box-shadow: 0 10px 22px rgba(0,0,0,.10);
+  }
+
+  /* --- gradient border on hover --- */
+  .card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, #a78bfa, #6366f1, #22d3ee);
+    -webkit-mask: 
+      linear-gradient(#fff 0 0) content-box, 
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 220ms ease;
+  }
+  .card:hover::before {
+    opacity: 1;
+  }
+
+  /* --- optional shine sweep --- */
+  .card::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(120deg,
+      transparent 0%,
+      rgba(255,255,255,0.18) 10%,
+      transparent 22%);
+    transform: translateX(-130%);
+    transition: transform 600ms ease;
+  }
+  .card:hover::after { transform: translateX(130%); }
+
+  /* --- media zoom + color pop --- */
+  .card .media img {
+    transition: transform 750ms ease, filter 240ms ease;
+    transform-origin: center;
+    will-change: transform, filter;
+  }
+  .card:hover .media img {
+    transform: scale(1.04);
+    filter: saturate(1.06);
+  }
+
+  /* --- spotlight + press ripple --- */
+  .card .spotlight {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: radial-gradient(220px circle at 50% 50%, rgba(99,102,241,0.18), transparent 60%);
+    opacity: 0;
+    transition: opacity 220ms ease;
+  }
+  .card:hover .spotlight { opacity: 1; }
+
+  .card .press {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    transform: translateZ(0);
+  }
+  .card:active .press {
+    animation: pressPulse 480ms ease-out;
+    background: radial-gradient(200px circle at 50% 50%, rgba(99,102,241,0.28), transparent 60%);
+  }
+  @keyframes pressPulse {
+    0%   { opacity: .35; transform: scale(.98); }
+    60%  { opacity: .15; transform: scale(1.01); }
+    100% { opacity: 0;   transform: scale(1.03); }
+  }
+
+  .card:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px rgba(255,255,255,1),
+      0 0 0 4px rgba(99,102,241,.65);
+  }
+`}</style>
+
+
+
+
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Masonry</h1>
         <div className="flex items-center gap-3">
@@ -411,9 +526,7 @@ export default function Masonry() {
       )}
 
       {/* brief hover/auto coachmark */}
-      <Coachmark show={showCoach}>
-        Drag any card to rearrange
-      </Coachmark>
+      <Coachmark show={showCoach}>Drag any card to rearrange</Coachmark>
 
       {items.length > 0 && (
         <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4 [column-fill:_balance]">
@@ -428,18 +541,25 @@ export default function Masonry() {
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                  className="mb-4 break-inside-avoid rounded-xl border bg-white overflow-hidden"
+                  className="card mb-4 break-inside-avoid rounded-xl border bg-white overflow-hidden cursor-grab"
                   draggable
+                  tabIndex={0}
                   onDragStart={() => !isUploading && onDragStart(it.id)}
                   onDragOver={(e) => !isUploading && onDragOver(e)}
                   onDrop={() => !isUploading && onDrop(it.id)}
                   title={isUploading ? "" : "Drag to reorder"}
                 >
+                  {/* spotlight & press overlays */}
+                  <span className="spotlight" aria-hidden="true" />
+                  <span className="press" aria-hidden="true" />
+
                   <MasonryAnimatedImage
                     src={it.optimizedURL}
                     alt={`Masonry image ${it.index}`}
                     badgeContent={`#${it.index}`}
+                    containerClassName="media"
                   />
+
                   <div className="p-3 flex items-center justify-end text-sm gap-2">
                     <Button
                       onClick={() => onReplaceClick(it)}

@@ -125,4 +125,4 @@ const Header = forwardRef(function Header(_, ref) {
   )
 })
 
-export default Header
+export default Header;

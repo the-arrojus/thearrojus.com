@@ -27,6 +27,10 @@ import {
   ChevronRightIcon,
   CalendarDaysIcon,
   XMarkIcon,
+  ChevronDownIcon,
+  ClockIcon,
+  CheckCircleIcon,
+  ExclamationTriangleIcon,
 } from "@heroicons/react/20/solid";
 import { UserCircleIcon } from "@heroicons/react/24/solid";
 
@@ -69,6 +73,10 @@ function getMonthGrid(viewYear, viewMonth, selectedYmd) {
     });
   }
   return days;
+}
+
+function classNames(...classes) {
+  return classes.filter(Boolean).join(" ");
 }
 
 function InviteRow({ invite, status, onToast }) {
@@ -354,7 +362,6 @@ export default function AdminTestimonials() {
         e.preventDefault();
         const full = suggestion;
         setEventPlace(full);
-        // place caret at end after React sets the value
         requestAnimationFrame(() => {
           const el = eventPlaceInputRef.current;
           if (el) {
@@ -432,6 +439,13 @@ export default function AdminTestimonials() {
     () => invites.filter((i) => statuses[i.token] === "done"),
     [invites, statuses]
   );
+  const expired = useMemo(
+    () => invites.filter((i) => statuses[i.token] === "expired"),
+    [invites, statuses]
+  );
+
+  // Tabs: 'pending' | 'done' | 'expired'
+  const [activeTab, setActiveTab] = useState("pending");
 
   if (!user) return null;
 
@@ -445,7 +459,7 @@ export default function AdminTestimonials() {
       {/* --- Create Invite --- */}
       <form
         onSubmit={createInvite}
-        className="grid grid-cols-1 gap-x-8 gap-y-10 border-b border-gray-900/10 pb-12 md:grid-cols-3"
+        className="grid grid-cols-1 gap-x-8 gap-y-10 pb-12 md:grid-cols-3"
       >
         <div>
           <h2 className="text-base/7 font-semibold text-gray-900">Create Invite</h2>
@@ -679,7 +693,7 @@ export default function AdminTestimonials() {
             </label>
 
             <div className="relative mt-2">
-              {/* Ghost suggestion overlay (leaves room for hint on right when visible) */}
+              {/* Ghost suggestion overlay */}
               <div
                 aria-hidden="true"
                 className={`pointer-events-none absolute left-3 ${
@@ -694,7 +708,7 @@ export default function AdminTestimonials() {
                 )}
               </div>
 
-              {/* Right-side hint: Press Tab to autocomplete */}
+              {/* Right-side hint */}
               {hasAutoComplete && (
                 <div
                   aria-hidden="true"
@@ -706,13 +720,13 @@ export default function AdminTestimonials() {
                 </div>
               )}
 
-              {/* Actual input (transparent to reveal ghost text) */}
+              {/* Actual input */}
               <input
                 ref={eventPlaceInputRef}
                 type="text"
                 value={eventPlace}
                 onChange={(e) => setEventPlace(e.target.value)}
-                onKeyDown={handleEventPlaceKeyDown} // Tab to accept (and stay)
+                onKeyDown={handleEventPlaceKeyDown}
                 placeholder="e.g., San Fransisco"
                 autoComplete="off"
                 className="block w-full rounded-md border border-gray-300 bg-transparent px-3 py-1.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-indigo-600"
@@ -739,50 +753,137 @@ export default function AdminTestimonials() {
         </div>
       </form>
 
-      {/* --- Pending --- */}
-      <section className="space-y-3">
-        <h2 className="text-xl font-semibold">Pending</h2>
-        {pending.length === 0 ? (
-          <div className="text-sm text-gray-500">No pending invites.</div>
-        ) : (
+      {/* --- Tabs (Pending / Done / Expired) --- */}
+      <section className="space-y-4">
+        {/* Responsive tabs header */}
+        <div>
+          {/* Mobile: select (icons not supported in native select) */}
+          <div className="grid grid-cols-1 sm:hidden">
+            <select
+              value={activeTab}
+              onChange={(e) => setActiveTab(e.target.value)}
+              aria-label="Select a tab"
+              className="col-start-1 row-start-1 w-full appearance-none rounded-md bg-white py-2 pr-8 pl-3 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600"
+            >
+              <option value="pending">Pending</option>
+              <option value="done">Done</option>
+              <option value="expired">Expired</option>
+            </select>
+            <ChevronDownIcon
+              aria-hidden="true"
+              className="pointer-events-none col-start-1 row-start-1 mr-2 size-5 self-center justify-self-end fill-gray-500"
+            />
+          </div>
+
+          {/* Desktop: tabs with icons */}
+          <div className="hidden sm:block">
+            <nav
+              aria-label="Tabs"
+              className="isolate flex divide-x divide-gray-200 rounded-lg bg-white shadow-sm"
+            >
+              {[
+                { key: "pending", name: "Pending", icon: ClockIcon },
+                { key: "done", name: "Done", icon: CheckCircleIcon },
+                { key: "expired", name: "Expired", icon: ExclamationTriangleIcon },
+              ].map((tab, idx) => {
+                const current = activeTab === tab.key;
+                const Icon = tab.icon;
+                return (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setActiveTab(tab.key)}
+                    aria-current={current ? "page" : undefined}
+                    className={classNames(
+                      current ? "text-gray-900" : "text-gray-500 hover:text-gray-700",
+                      idx === 0 ? "rounded-l-lg" : "",
+                      idx === 2 ? "rounded-r-lg" : "",
+                      "group relative min-w-0 flex-1 overflow-hidden px-4 py-4 text-center text-sm font-medium hover:bg-gray-50 focus:z-10"
+                    )}
+                  >
+                    <span className="inline-flex items-center justify-center gap-2">
+                      <Icon
+                        aria-hidden="true"
+                        className={classNames(
+                          "size-5",
+                          current ? "text-indigo-600" : "text-gray-400 group-hover:text-gray-500"
+                        )}
+                      />
+                      <span>{tab.name}</span>
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className={classNames(
+                        current ? "bg-indigo-500" : "bg-transparent",
+                        "absolute inset-x-0 bottom-0 h-0.5"
+                      )}
+                    />
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+        </div>
+
+        {/* Tab Panels */}
+        {activeTab === "pending" && (
           <div className="space-y-3">
-            {pending.map((inv) => (
-              <InviteRow key={inv.token} invite={inv} status="pending" onToast={showToast} />
-            ))}
+            {pending.length === 0 ? (
+              <div className="text-sm text-gray-500">No pending invites.</div>
+            ) : (
+              <div className="space-y-3">
+                {pending.map((inv) => (
+                  <InviteRow
+                    key={inv.token}
+                    invite={inv}
+                    status="pending"
+                    onToast={showToast}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
-      </section>
 
-      {/* --- Done --- */}
-      <section className="space-y-3">
-        <h2 className="text-xl font-semibold">Done</h2>
-        {done.length === 0 ? (
-          <div className="text-sm text-gray-500">
-            No completed testimonials yet.
-          </div>
-        ) : (
+        {activeTab === "done" && (
           <div className="space-y-3">
-            {done.map((inv) => (
-              <InviteRow key={inv.token} invite={inv} status="done" onToast={showToast} />
-            ))}
+            {done.length === 0 ? (
+              <div className="text-sm text-gray-500">
+                No completed testimonials yet.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {done.map((inv) => (
+                  <InviteRow
+                    key={inv.token}
+                    invite={inv}
+                    status="done"
+                    onToast={showToast}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         )}
-      </section>
 
-      {/* --- Expired --- */}
-      <section className="space-y-3">
-        <details className="rounded-xl border p-3 bg-gray-50">
-          <summary className="cursor-pointer font-medium">
-            Expired (no submission)
-          </summary>
-          <div className="mt-3 space-y-3">
-            {invites
-              .filter((i) => statuses[i.token] === "expired")
-              .map((inv) => (
-                <InviteRow key={inv.token} invite={inv} status="expired" onToast={showToast} />
-              ))}
+        {activeTab === "expired" && (
+          <div className="space-y-3">
+            {expired.length === 0 ? (
+              <div className="text-sm text-gray-500">No expired invites.</div>
+            ) : (
+              <div className="space-y-3">
+                {expired.map((inv) => (
+                  <InviteRow
+                    key={inv.token}
+                    invite={inv}
+                    status="expired"
+                    onToast={showToast}
+                  />
+                ))}
+              </div>
+            )}
           </div>
-        </details>
+        )}
       </section>
 
       {showCropper && rawAvatarFile && (
