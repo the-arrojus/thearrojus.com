@@ -30,6 +30,9 @@ import {
 } from "@heroicons/react/20/solid";
 import { UserCircleIcon } from "@heroicons/react/24/solid";
 
+// California cities list (keep sorted for best UX)
+import CA_CITIES from "../../data/ca_cities";
+
 function makeToken() {
   return crypto.randomUUID().replace(/-/g, "");
 }
@@ -115,7 +118,9 @@ function InviteRow({ invite, status }) {
             </div>
           )}
           <div className="font-mono break-all text-gray-600">{link}</div>
-          <div className="text-xs text-gray-500">Expires: {exp.toLocaleString()}</div>
+          <div className="text-xs text-gray-500">
+            Expires: {exp.toLocaleString()}
+          </div>
           {status === "expired" && (
             <div className="text-xs font-medium text-orange-600">Expired</div>
           )}
@@ -146,7 +151,7 @@ export default function AdminTestimonials() {
   const { user } = useAuth();
   const [eventName, setEventName] = useState("");
   const [clientName, setClientName] = useState("");
-  const [eventPlace, setEventPlace] = useState("");
+  const [eventPlace, setEventPlace] = useState(""); // ghost autocomplete
   const [eventDate, setEventDate] = useState(""); // yyyy-mm-dd
 
   const [inviteToken, setInviteToken] = useState("");
@@ -164,8 +169,11 @@ export default function AdminTestimonials() {
   const calRef = useRef(null);
   const anchorRef = useRef(null);
 
-  // Hidden file input for "Change" button
+  // Hidden file input for avatar "Change" button
   const avatarInputRef = useRef(null);
+
+  // Input ref for Event Place (needed to keep focus / caret on Tab-accept)
+  const eventPlaceInputRef = useRef(null);
 
   // Month view follows selected date (or today)
   const base = eventDate ? new Date(eventDate) : new Date();
@@ -240,6 +248,7 @@ export default function AdminTestimonials() {
     };
   }, [isCalOpen]);
 
+  // Live invites + statuses
   useEffect(() => {
     if (!user) return;
     const q = query(
@@ -312,6 +321,42 @@ export default function AdminTestimonials() {
     setShowCropper(false);
   };
 
+  /* -------- Ghost autocomplete (Event Place) -------- */
+  const suggestion = useMemo(() => {
+    const qRaw = eventPlace;
+    if (!qRaw) return "";
+    const q = qRaw.toLowerCase();
+    return CA_CITIES.find((c) => c.toLowerCase().startsWith(q)) || "";
+  }, [eventPlace]);
+
+  const hasAutoComplete = useMemo(() => {
+    if (!eventPlace || !suggestion) return false;
+    const val = eventPlace.toLowerCase();
+    const s = suggestion.toLowerCase();
+    return s.startsWith(val) && s.length > val.length;
+  }, [eventPlace, suggestion]);
+
+  const handleEventPlaceKeyDown = (e) => {
+    if (e.key === "Tab") {
+      if (hasAutoComplete) {
+        // Accept suggestion but KEEP focus here
+        e.preventDefault();
+        const full = suggestion;
+        setEventPlace(full);
+        // place caret at end after React sets the value
+        requestAnimationFrame(() => {
+          const el = eventPlaceInputRef.current;
+          if (el) {
+            const end = full.length;
+            el.setSelectionRange(end, end);
+          }
+        });
+      }
+      // else let Tab move normally
+    }
+  };
+  /* ----------------------------------------------- */
+
   const createInvite = async (e) => {
     e.preventDefault();
     setErr(null);
@@ -330,7 +375,9 @@ export default function AdminTestimonials() {
     try {
       const token = ensureToken();
       const expiresAt = Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000);
-      const eventDateTs = eventDate ? Timestamp.fromDate(new Date(eventDate)) : null;
+      const eventDateTs = eventDate
+        ? Timestamp.fromDate(new Date(eventDate))
+        : null;
 
       await setDoc(doc(db, "testimonialInvites", token), {
         token,
@@ -339,7 +386,7 @@ export default function AdminTestimonials() {
         clientName: clientName.trim(),
         eventPlace: eventPlace.trim() || null,
         eventDate: eventDateTs,
-        avatarUrl: avatarUrl, // mandatory
+        avatarUrl, // mandatory
         createdAt: serverTimestamp(),
         expiresAt,
       });
@@ -391,7 +438,7 @@ export default function AdminTestimonials() {
         </div>
 
         <div className="grid max-w-2xl grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6 md:col-span-2">
-          {/* Avatar uploader — REQUIRED, using the provided UI (no inline error text) */}
+          {/* Avatar uploader — REQUIRED */}
           <div className="sm:col-span-6">
             <label className="block text-sm/6 font-medium text-gray-900">
               Photo <span className="text-red-600">*</span>
@@ -404,7 +451,10 @@ export default function AdminTestimonials() {
                   className="size-12 rounded-full object-cover border"
                 />
               ) : (
-                <UserCircleIcon aria-hidden="true" className="size-12 text-gray-300" />
+                <UserCircleIcon
+                  aria-hidden="true"
+                  className="size-12 text-gray-300"
+                />
               )}
 
               {/* Hidden input triggered by the Change button */}
@@ -492,7 +542,10 @@ export default function AdminTestimonials() {
                       })
                     : "Select date"}
                 </span>
-                <CalendarDaysIcon className="size-5 text-gray-400" aria-hidden="true" />
+                <CalendarDaysIcon
+                  className="size-5 text-gray-400"
+                  aria-hidden="true"
+                />
               </button>
             </div>
 
@@ -573,11 +626,14 @@ export default function AdminTestimonials() {
                   <div className="mt-4 flex items-center justify-between border-t pt-3 text-xs text-gray-600">
                     <span>
                       {eventDate
-                        ? `Selected: ${new Date(eventDate).toLocaleDateString(undefined, {
-                            year: "numeric",
-                            month: "long",
-                            day: "numeric",
-                          })}`
+                        ? `Selected: ${new Date(eventDate).toLocaleDateString(
+                            undefined,
+                            {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            }
+                          )}`
                         : "No date selected"}
                     </span>
                     <button
@@ -599,18 +655,56 @@ export default function AdminTestimonials() {
             )}
           </div>
 
-          {/* Event Place */}
+          {/* Event Place with ghost autocomplete + Tab hint */}
           <div className="sm:col-span-3">
             <label className="block text-sm/6 font-medium text-gray-900">
               Event Place
             </label>
-            <input
-              type="text"
-              value={eventPlace}
-              onChange={(e) => setEventPlace(e.target.value)}
-              placeholder="Venue / City"
-              className="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-indigo-600"
-            />
+
+            <div className="relative mt-2">
+              {/* Ghost suggestion overlay (leaves room for hint on right when visible) */}
+              <div
+                aria-hidden="true"
+                className={`pointer-events-none absolute left-3 ${
+                  hasAutoComplete ? "right-28" : "right-3"
+                } top-0 bottom-0 flex items-center text-base`}
+              >
+                <span className="invisible whitespace-pre">{eventPlace}</span>
+                {hasAutoComplete && (
+                  <span className="text-gray-400 whitespace-pre">
+                    {suggestion.slice(eventPlace.length)}
+                  </span>
+                )}
+              </div>
+
+              {/* Right-side hint: Press Tab to autocomplete */}
+              {hasAutoComplete && (
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-1 text-xs text-gray-400"
+                >
+                  <span>Press</span>
+                  <kbd className="rounded border border-gray-300 px-1 py-0.5">Tab</kbd>
+                  <span>to autocomplete</span>
+                </div>
+              )}
+
+              {/* Actual input (transparent to reveal ghost text) */}
+              <input
+                ref={eventPlaceInputRef}
+                type="text"
+                value={eventPlace}
+                onChange={(e) => setEventPlace(e.target.value)}
+                onKeyDown={handleEventPlaceKeyDown} // Tab to accept (and stay)
+                placeholder="Venue / City"
+                autoComplete="off"
+                className="block w-full rounded-md border border-gray-300 bg-transparent px-3 py-1.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-indigo-600"
+              />
+            </div>
+
+            <p className="mt-1 text-xs text-gray-500 sm:hidden">
+              Press Tab to autocomplete.
+            </p>
           </div>
 
           <div className="col-span-full flex items-center gap-3">
@@ -646,7 +740,9 @@ export default function AdminTestimonials() {
       <section className="space-y-3">
         <h2 className="text-xl font-semibold">Done</h2>
         {done.length === 0 ? (
-          <div className="text-sm text-gray-500">No completed testimonials yet.</div>
+          <div className="text-sm text-gray-500">
+            No completed testimonials yet.
+          </div>
         ) : (
           <div className="space-y-3">
             {done.map((inv) => (
