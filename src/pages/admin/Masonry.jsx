@@ -21,6 +21,8 @@ import {
 } from "firebase/storage";
 import { AnimatePresence, motion } from "framer-motion";
 import Button from "../../components/Button";
+import Coachmark from "../../components/Coachmark";
+import { useAutoCoachmark } from "../../hooks/useAutoCoachmark";
 
 /* -------------------- image tuning -------------------- */
 const OPT_MAX_DIM = 2400;
@@ -164,6 +166,9 @@ export default function Masonry() {
   const containerRef = useRef(null);
 
   const dragAuto = useRef({ active: false, y: 0, raf: 0, cleanup: null });
+
+  // 👇 show coachmark briefly when there are 2+ items
+  const [showCoach] = useAutoCoachmark(items.length >= 2, 2400);
 
   useEffect(() => {
     const q = query(collection(db, "masonry"), orderBy("index", "asc"), limit(MAX_MASONRY));
@@ -404,6 +409,11 @@ export default function Masonry() {
           </div>
         </div>
       )}
+
+      {/* brief hover/auto coachmark */}
+      <Coachmark show={showCoach}>
+        Drag any card to rearrange
+      </Coachmark>
 
       {items.length > 0 && (
         <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4 [column-fill:_balance]">

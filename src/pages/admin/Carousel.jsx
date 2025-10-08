@@ -21,23 +21,24 @@ import {
 } from "firebase/storage";
 import { AnimatePresence, motion } from "framer-motion";
 import Button from "../../components/Button";
+import Coachmark from "../../components/Coachmark";
+import { useAutoCoachmark } from "../../hooks/useAutoCoachmark";
 
 /* -------------------- image tuning -------------------- */
-const OPT_MAX_DIM = 2400;     // gentler resize ceiling (was 1600)
-const OPT_QUALITY = 0.9;      // higher JPEG quality (was 0.82)
-const TINY_DIM = 20;          // tiny LQIP size for blur placeholder
+const OPT_MAX_DIM = 2400;
+const OPT_QUALITY = 0.9;
+const TINY_DIM = 20;
 
 function shouldSkipOptimization(file, imgWidth, imgHeight) {
   const longest = Math.max(imgWidth, imgHeight);
   return (
     file?.type === "image/jpeg" &&
     longest <= 2200 &&
-    file.size <= 2.5 * 1024 * 1024 // <= 2.5MB
+    file.size <= 2.5 * 1024 * 1024
   );
 }
-/* ------------------------------------------------------ */
 
-// --- image helpers (optimize + tiny blur for UX) ---
+/* ---------- image helpers ---------- */
 async function fileToImageBitmap(file) {
   return await createImageBitmap(file);
 }
@@ -57,8 +58,6 @@ function drawToCanvas(imgBitmap, maxDim, quality = OPT_QUALITY) {
 }
 async function makeOptimizedAndBlur(file) {
   const img = await fileToImageBitmap(file);
-
-  // Smart: keep original as "optimized" if it's already modest.
   let optimizedBlob;
   if (shouldSkipOptimization(file, img.width, img.height)) {
     optimizedBlob = file;
@@ -66,8 +65,6 @@ async function makeOptimizedAndBlur(file) {
     const opt = drawToCanvas(img, OPT_MAX_DIM, OPT_QUALITY);
     optimizedBlob = await opt.toBlob();
   }
-
-  // Tiny LQIP for blurDataURL
   const tiny = drawToCanvas(img, TINY_DIM, 0.7);
   const tinyBlob = await tiny.toBlob();
   const blurDataURL = await new Promise((res) => {
@@ -77,9 +74,8 @@ async function makeOptimizedAndBlur(file) {
   });
   return { optimizedBlob, blurDataURL };
 }
-// ----------------------------------------------------
 
-// Recursively delete everything under a "folder" prefix in Storage
+/* ---------- delete folder recursively ---------- */
 async function deleteFolder(path) {
   const folderRef = ref(storage, path);
   const { items, prefixes } = await listAll(folderRef);
@@ -89,7 +85,7 @@ async function deleteFolder(path) {
 
 const MAX_IMAGES = 5;
 
-/* ---------- Accessibility hook for reduced motion ---------- */
+/* ---------- reduced motion hook ---------- */
 function usePrefersReducedMotion() {
   const [reduced, setReduced] = useState(false);
   useEffect(() => {
@@ -107,11 +103,9 @@ function usePrefersReducedMotion() {
   return reduced;
 }
 
-/* ---------- Animated image: cross-fade + gentle zoom ---------- */
+/* ---------- animated image ---------- */
 function AnimatedImage({ src, alt = "" }) {
   const reduce = usePrefersReducedMotion();
-
-  // When `src` changes (replace), AnimatePresence will cross-fade old->new.
   return (
     <div className="relative w-full h-full">
       <AnimatePresence initial={false} mode="popLayout">
@@ -138,20 +132,20 @@ function AnimatedImage({ src, alt = "" }) {
   );
 }
 
+/* ---------- main component ---------- */
 export default function AdminCarousel() {
-  const [items, setItems] = useState([]);            // [{id,index,optimizedURL,...}]
+  const [items, setItems] = useState([]);
   const [busyGlobal, setBusyGlobal] = useState(false);
-  const [busyIds, setBusyIds] = useState(new Set()); // disabling buttons per item
+  const [busyIds, setBusyIds] = useState(new Set());
   const [dragId, setDragId] = useState(null);
-
-  // Single, top upload progress bar (overall)
   const [overall, setOverall] = useState({ totalBytes: 0, transferred: 0, active: 0 });
-
-  // Hidden file inputs (main upload + per-item replace)
   const uploadInputRef = useRef(null);
-  const replaceInputRefs = useRef({}); // {itemId: input}
+  const replaceInputRefs = useRef({});
 
-  // Real-time: keep admin/gallery in sync and ordered
+  // coachmark shows briefly when there are 2+ items
+  const [showCoach] = useAutoCoachmark(items.length >= 2, 2400);
+
+  // realtime listener
   useEffect(() => {
     const q = query(collection(db, "gallery"), orderBy("index", "asc"), limit(MAX_IMAGES));
     const unsub = onSnapshot(q, (snap) => {
@@ -163,27 +157,22 @@ export default function AdminCarousel() {
 
   const canAdd = items.length < MAX_IMAGES;
 
-  // Reusable uploader with single overall progress
+  /* ---------- uploader ---------- */
   async function uploadOriginalAndOptimized({ file, id }) {
     const { optimizedBlob, blurDataURL } = await makeOptimizedAndBlur(file);
-
     const originalRef = ref(storage, `gallery/${id}/original.jpg`);
     const optimizedRef = ref(storage, `gallery/${id}/optimized.jpg`);
-
     const totalBytes = file.size + (optimizedBlob?.size ?? 0);
     let origPrev = 0;
     let optPrev = 0;
 
-    // mark one active job
     setOverall((s) => ({
       totalBytes: s.totalBytes + totalBytes,
       transferred: s.transferred,
       active: s.active + 1,
     }));
-
-    const bump = (deltaOrig, deltaOpt) => {
-      setOverall((s) => ({ ...s, transferred: s.transferred + deltaOrig + deltaOpt }));
-    };
+    const bump = (d1, d2) =>
+      setOverall((s) => ({ ...s, transferred: s.transferred + d1 + d2 }));
 
     const originalTask = uploadBytesResumable(originalRef, file, {
       contentType: file.type || "image/jpeg",
@@ -192,7 +181,7 @@ export default function AdminCarousel() {
       contentType: "image/jpeg",
     });
 
-    const origPromise = new Promise((resolve, reject) => {
+    const origPromise = new Promise((res, rej) => {
       originalTask.on(
         "state_changed",
         (snap) => {
@@ -200,12 +189,11 @@ export default function AdminCarousel() {
           origPrev = snap.bytesTransferred;
           bump(delta, 0);
         },
-        reject,
-        resolve
+        rej,
+        res
       );
     });
-
-    const optPromise = new Promise((resolve, reject) => {
+    const optPromise = new Promise((res, rej) => {
       optimizedTask.on(
         "state_changed",
         (snap) => {
@@ -213,50 +201,41 @@ export default function AdminCarousel() {
           optPrev = snap.bytesTransferred;
           bump(0, delta);
         },
-        reject,
-        resolve
+        rej,
+        res
       );
     });
-
     await Promise.all([origPromise, optPromise]);
-
     const [originalURL, optimizedURL] = await Promise.all([
       getDownloadURL(originalRef),
       getDownloadURL(optimizedRef),
     ]);
-
-    // mark job complete
     setOverall((s) => {
       const nextActive = Math.max(0, s.active - 1);
       const doneAll = nextActive === 0 && s.transferred >= s.totalBytes;
       return doneAll ? { totalBytes: 0, transferred: 0, active: 0 } : { ...s, active: nextActive };
     });
-
     return { originalURL, optimizedURL, blurDataURL };
   }
 
-  // Handle new uploads (can be multiple files)
+  /* ---------- upload pick ---------- */
   const onPick = async (e) => {
     const files = Array.from(e.target.files || []);
     e.target.value = "";
     if (!files.length) return;
     if (!canAdd) return alert(`Gallery is full (max ${MAX_IMAGES}).`);
-
     setBusyGlobal(true);
     try {
       const slots = Math.max(0, MAX_IMAGES - items.length);
       const selected = files.slice(0, slots);
-
       for (let i = 0; i < selected.length; i++) {
         const file = selected[i];
         const id = (crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`)
           .toString()
           .replace(/-/g, "");
         const nextIndex = items.length + 1 + i;
-
         const { originalURL, optimizedURL, blurDataURL } =
           await uploadOriginalAndOptimized({ file, id });
-
         await setDoc(doc(db, "gallery", id), {
           index: nextIndex,
           originalPath: `gallery/${id}/original.jpg`,
@@ -273,11 +252,10 @@ export default function AdminCarousel() {
       alert("Upload failed.");
     } finally {
       setBusyGlobal(false);
-      // overall auto-resets when all active jobs finish
     }
   };
 
-  // Replace one image (keeps same doc id and index)
+  /* ---------- replace image ---------- */
   const onReplaceClick = (item) => {
     replaceInputRefs.current[item.id]?.click();
   };
@@ -287,7 +265,6 @@ export default function AdminCarousel() {
     try {
       const { originalURL, optimizedURL, blurDataURL } =
         await uploadOriginalAndOptimized({ file, id: item.id });
-
       await setDoc(
         doc(db, "gallery", item.id),
         { originalURL, optimizedURL, blurDataURL, updatedAt: serverTimestamp() },
@@ -305,26 +282,19 @@ export default function AdminCarousel() {
     }
   };
 
-  // Delete image: remove folder, Firestore doc, then reindex
+  /* ---------- delete ---------- */
   const onDelete = async (item) => {
     if (!confirm("Delete this image?")) return;
-
     const prev = items;
     const next = prev.filter((x) => x.id !== item.id).map((x, i) => ({ ...x, index: i + 1 }));
     setItems(next);
     setBusyIds((s) => new Set(s).add(item.id));
-
     try {
       await deleteFolder(`gallery/${item.id}`);
       await deleteDoc(doc(db, "gallery", item.id));
-
       const batch = writeBatch(db);
       next.forEach((x, i) => {
-        batch.set(
-          doc(db, "gallery", x.id),
-          { index: i + 1, updatedAt: serverTimestamp() },
-          { merge: true }
-        );
+        batch.set(doc(db, "gallery", x.id), { index: i + 1, updatedAt: serverTimestamp() }, { merge: true });
       });
       await batch.commit();
     } catch (err) {
@@ -340,7 +310,7 @@ export default function AdminCarousel() {
     }
   };
 
-  // Drag & drop reorder (Framer Motion animates layout)
+  /* ---------- drag reorder ---------- */
   const onDragStart = (id) => setDragId(id);
   const onDragOver = (e) => e.preventDefault();
   const onDrop = async (overId) => {
@@ -370,7 +340,6 @@ export default function AdminCarousel() {
     }
   };
 
-  // Top upload progress (overall)
   const uploadPct = useMemo(() => {
     if (!overall.totalBytes) return 0;
     return Math.min(100, Math.round((overall.transferred / overall.totalBytes) * 100));
@@ -383,8 +352,6 @@ export default function AdminCarousel() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Carousel</h1>
-
-        {/* Upload Button (shadcn-style) */}
         <div className="flex items-center gap-3">
           <Button
             onClick={() => uploadInputRef.current?.click()}
@@ -395,8 +362,6 @@ export default function AdminCarousel() {
           >
             {canAdd ? "Upload" : "Full"}
           </Button>
-
-          {/* hidden file input used by the button above */}
           <input
             type="file"
             accept="image/*"
@@ -409,7 +374,7 @@ export default function AdminCarousel() {
         </div>
       </div>
 
-      {/* Single top upload progress bar */}
+      {/* Upload progress */}
       {overall.totalBytes > 0 && (
         <div className="w-full rounded-lg bg-gray-200 overflow-hidden">
           <div
@@ -419,7 +384,7 @@ export default function AdminCarousel() {
         </div>
       )}
 
-      {/* While uploading & empty: simple loading (no CTA) */}
+      {/* While uploading & empty */}
       {isUploading && items.length === 0 && (
         <div className="rounded-xl border p-6 text-center bg-white text-gray-700">
           <div className="flex items-center justify-center gap-3">
@@ -432,79 +397,76 @@ export default function AdminCarousel() {
         </div>
       )}
 
-      {/* Grid: only show when there are items */}
+      {/* Hover/auto coachmark (reusable component) */}
+      <Coachmark show={showCoach}>
+        Drag any card to rearrange
+      </Coachmark>
+
+      {/* Grid */}
       {items.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <AnimatePresence initial={false}>
-            {items.map((it) => {
-              const itemBusy = busyIds.has(it.id) || isUploading;
-              return (
-                <motion.div
-  key={it.id}
-  layout
-  initial={{ opacity: 0.6, scale: 0.98 }}
-  animate={{ opacity: 1, scale: 1 }}
-  exit={{ opacity: 0 }}
-  transition={{ type: "spring", stiffness: 300, damping: 30 }}
-  className="rounded-xl border bg-white overflow-hidden flex flex-col"
-  draggable
-  onDragStart={() => !isUploading && onDragStart(it.id)}
-  onDragOver={(e) => !isUploading && onDragOver(e)}
-  onDrop={() => !isUploading && onDrop(it.id)}
-  title={isUploading ? "" : "Drag to reorder"}
->
-  {/* Media area (fixed aspect) */}
-  <div className="aspect-[3/2] overflow-hidden relative">
-    <AnimatedImage src={it.optimizedURL} alt={`Gallery image ${it.index}`} />
+            {items.map((it) => (
+              <motion.div
+                key={it.id}
+                layout
+                initial={{ opacity: 0.6, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                className="rounded-xl border bg-white overflow-hidden flex flex-col cursor-grab active:cursor-grabbing"
+                draggable
+                onDragStart={() => !isUploading && onDragStart(it.id)}
+                onDragOver={(e) => !isUploading && onDragOver(e)}
+                onDrop={() => !isUploading && onDrop(it.id)}
+                title={isUploading ? "" : "Drag to reorder"}
+              >
+                <div className="aspect-[3/2] overflow-hidden relative">
+                  <AnimatedImage src={it.optimizedURL} alt={`Gallery image ${it.index}`} />
+                  <span className="absolute left-2 top-2 z-30 rounded-full bg-black/60 text-white text-xs px-2 py-1 leading-none">
+                    #{it.index}
+                  </span>
+                </div>
 
-    {/* Index badge moved onto the image */}
-    <span className="absolute left-2 top-2 z-30 rounded-full bg-black/60 text-white text-xs px-2 py-1 leading-none">
-      #{it.index}
-    </span>
-  </div>
+                <div className="px-3 py-2 flex items-center justify-end gap-2 text-sm">
+                  <Button
+                    onClick={() => onReplaceClick(it)}
+                    disabled={busyIds.has(it.id) || isUploading}
+                    loading={busyIds.has(it.id)}
+                    loadingText="Working…"
+                    variant="secondary"
+                    size="sm"
+                    className="h-8 px-3"
+                  >
+                    Replace
+                  </Button>
 
-  {/* Compact footer — no fixed height, less padding */}
-  <div className="px-3 py-2 flex items-center justify-end gap-2 text-sm">
-    <Button
-      onClick={() => onReplaceClick(it)}
-      disabled={busyIds.has(it.id) || isUploading}
-      loading={busyIds.has(it.id)}
-      loadingText="Working…"
-      variant="secondary"
-      size="sm"
-      className="h-8 px-3"
-    >
-      Replace
-    </Button>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    hidden
+                    ref={(el) => (replaceInputRefs.current[it.id] = el)}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      e.target.value = "";
+                      if (f) onReplaceFile(it, f);
+                    }}
+                  />
 
-    <input
-      type="file"
-      accept="image/*"
-      hidden
-      ref={(el) => (replaceInputRefs.current[it.id] = el)}
-      onChange={(e) => {
-        const f = e.target.files?.[0];
-        e.target.value = "";
-        if (f) onReplaceFile(it, f);
-      }}
-    />
-
-    <Button
-      onClick={() => onDelete(it)}
-      disabled={busyIds.has(it.id) || isUploading}
-      loading={busyIds.has(it.id)}
-      loadingText="Deleting…"
-      variant="destructive"
-      size="sm"
-      className="h-8 px-3"
-    >
-      Delete
-    </Button>
-  </div>
-</motion.div>
-
-              );
-            })}
+                  <Button
+                    onClick={() => onDelete(it)}
+                    disabled={busyIds.has(it.id) || isUploading}
+                    loading={busyIds.has(it.id)}
+                    loadingText="Deleting…"
+                    variant="destructive"
+                    size="sm"
+                    className="h-8 px-3"
+                  >
+                    Delete
+                  </Button>
+                </div>
+              </motion.div>
+            ))}
           </AnimatePresence>
         </div>
       )}
