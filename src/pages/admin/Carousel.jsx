@@ -103,18 +103,24 @@ function usePrefersReducedMotion() {
   return reduced;
 }
 
-/* ---------- animated image ---------- */
-function AnimatedImage({ src, alt = "" }) {
+/* ---------- Animated image (same as Masonry) ---------- */
+function CarouselAnimatedImage({ src, alt = "", badgeContent, containerClassName = "" }) {
   const reduce = usePrefersReducedMotion();
   return (
-    <div className="relative w-full h-full">
+    <div className={`relative grid [grid-template-areas:_'stack'] overflow-hidden ${containerClassName}`}>
+      {badgeContent && (
+        <span className="absolute left-2 top-2 z-30 rounded-full bg-black/60 text-white text-xs px-2 py-1 leading-none">
+          {badgeContent}
+        </span>
+      )}
       <AnimatePresence initial={false} mode="popLayout">
         <motion.img
           key={src}
           src={src}
           alt={alt}
           draggable={false}
-          className="absolute inset-0 object-cover"
+          loading="lazy"
+          className="block w-full h-full object-cover [grid-area:stack]"
           initial={{ opacity: 0, scale: reduce ? 1.0 : 1.02 }}
           animate={{
             opacity: 1,
@@ -181,40 +187,44 @@ export default function AdminCarousel() {
       contentType: "image/jpeg",
     });
 
-    const origPromise = new Promise((res, rej) => {
-      originalTask.on(
-        "state_changed",
-        (snap) => {
-          const delta = snap.bytesTransferred - origPrev;
-          origPrev = snap.bytesTransferred;
-          bump(delta, 0);
-        },
-        rej,
-        res
-      );
-    });
-    const optPromise = new Promise((res, rej) => {
-      optimizedTask.on(
-        "state_changed",
-        (snap) => {
-          const delta = snap.bytesTransferred - optPrev;
-          optPrev = snap.bytesTransferred;
-          bump(0, delta);
-        },
-        rej,
-        res
-      );
-    });
-    await Promise.all([origPromise, optPromise]);
+    await Promise.all([
+      new Promise((res, rej) =>
+        originalTask.on(
+          "state_changed",
+          (snap) => {
+            const delta = snap.bytesTransferred - origPrev;
+            origPrev = snap.bytesTransferred;
+            bump(delta, 0);
+          },
+          rej,
+          res
+        )
+      ),
+      new Promise((res, rej) =>
+        optimizedTask.on(
+          "state_changed",
+          (snap) => {
+            const delta = snap.bytesTransferred - optPrev;
+            optPrev = snap.bytesTransferred;
+            bump(0, delta);
+          },
+          rej,
+          res
+        )
+      ),
+    ]);
+
     const [originalURL, optimizedURL] = await Promise.all([
       getDownloadURL(originalRef),
       getDownloadURL(optimizedRef),
     ]);
+
     setOverall((s) => {
       const nextActive = Math.max(0, s.active - 1);
       const doneAll = nextActive === 0 && s.transferred >= s.totalBytes;
       return doneAll ? { totalBytes: 0, transferred: 0, active: 0 } : { ...s, active: nextActive };
     });
+
     return { originalURL, optimizedURL, blurDataURL };
   }
 
@@ -349,6 +359,117 @@ export default function AdminCarousel() {
 
   return (
     <div className="space-y-8">
+      {/* card styles copied from Masonry */}
+      <style>{`
+  .card {
+    position: relative;
+    transition:
+      transform 220ms cubic-bezier(.2,.8,.2,1),
+      box-shadow 220ms ease,
+      border-color 220ms ease,
+      filter 220ms ease;
+    border: 1px solid rgba(0,0,0,0.08);
+    border-radius: 0.75rem; /* rounded-xl */
+    background: white;
+    will-change: transform, box-shadow, filter;
+  }
+
+  .card:hover {
+    transform: translateY(-2px) scale(1.01);
+    box-shadow:
+      0 14px 30px rgba(0,0,0,.10),
+      0 3px 10px rgba(0,0,0,.08);
+  }
+
+  .card:active {
+    transform: translateY(0) scale(0.997);
+    cursor: grabbing;
+    box-shadow: 0 10px 22px rgba(0,0,0,.10);
+  }
+
+  /* gradient border on hover */
+  .card::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(135deg, #a78bfa, #6366f1, #22d3ee);
+    -webkit-mask: 
+      linear-gradient(#fff 0 0) content-box, 
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 220ms ease;
+  }
+  .card:hover::before { opacity: 1; }
+
+  /* shine sweep */
+  .card::after {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    pointer-events: none;
+    background: linear-gradient(120deg,
+      transparent 0%,
+      rgba(255,255,255,0.18) 10%,
+      transparent 22%);
+    transform: translateX(-130%);
+    transition: transform 600ms ease;
+  }
+  .card:hover::after { transform: translateX(130%); }
+
+  /* media zoom + color pop */
+  .card .media img {
+    transition: transform 750ms ease, filter 240ms ease;
+    transform-origin: center;
+    will-change: transform, filter;
+  }
+  .card:hover .media img {
+    transform: scale(1.04);
+    filter: saturate(1.06);
+  }
+
+  /* spotlight + press ripple */
+  .card .spotlight {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    background: radial-gradient(220px circle at 50% 50%, rgba(99,102,241,0.18), transparent 60%);
+    opacity: 0;
+    transition: opacity 220ms ease;
+  }
+  .card:hover .spotlight { opacity: 1; }
+
+  .card .press {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    transform: translateZ(0);
+  }
+  .card:active .press {
+    animation: pressPulse 480ms ease-out;
+    background: radial-gradient(200px circle at 50% 50%, rgba(99,102,241,0.28), transparent 60%);
+  }
+  @keyframes pressPulse {
+    0%   { opacity: .35; transform: scale(.98); }
+    60%  { opacity: .15; transform: scale(1.01); }
+    100% { opacity: 0;   transform: scale(1.03); }
+  }
+
+  .card:focus-visible {
+    outline: none;
+    box-shadow:
+      0 0 0 2px rgba(255,255,255,1),
+      0 0 0 4px rgba(99,102,241,.65);
+  }
+`}</style>
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Carousel</h1>
@@ -397,76 +518,84 @@ export default function AdminCarousel() {
         </div>
       )}
 
-      {/* Hover/auto coachmark (reusable component) */}
-      <Coachmark show={showCoach}>
-        Drag any card to rearrange
-      </Coachmark>
+      {/* Hover/auto coachmark */}
+      <Coachmark show={showCoach}>Drag any card to rearrange</Coachmark>
 
       {/* Grid */}
       {items.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <AnimatePresence initial={false}>
-            {items.map((it) => (
-              <motion.div
-                key={it.id}
-                layout
-                initial={{ opacity: 0.6, scale: 0.98 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                className="rounded-xl border bg-white overflow-hidden flex flex-col cursor-grab active:cursor-grabbing"
-                draggable
-                onDragStart={() => !isUploading && onDragStart(it.id)}
-                onDragOver={(e) => !isUploading && onDragOver(e)}
-                onDrop={() => !isUploading && onDrop(it.id)}
-                title={isUploading ? "" : "Drag to reorder"}
-              >
-                <div className="aspect-[3/2] overflow-hidden relative">
-                  <AnimatedImage src={it.optimizedURL} alt={`Gallery image ${it.index}`} />
-                  <span className="absolute left-2 top-2 z-30 rounded-full bg-black/60 text-white text-xs px-2 py-1 leading-none">
-                    #{it.index}
-                  </span>
-                </div>
+            {items.map((it) => {
+              const itemBusy = busyIds.has(it.id) || isUploading;
+              return (
+                <motion.div
+                  key={it.id}
+                  layout
+                  initial={{ opacity: 0.6, scale: 0.98 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  className="card rounded-xl border bg-white overflow-hidden flex flex-col cursor-grab active:cursor-grabbing"
+                  draggable
+                  tabIndex={0}
+                  onDragStart={() => !isUploading && onDragStart(it.id)}
+                  onDragOver={(e) => !isUploading && onDragOver(e)}
+                  onDrop={() => !isUploading && onDrop(it.id)}
+                  title={isUploading ? "" : "Drag to reorder"}
+                >
+                  {/* spotlight & press overlays */}
+                  <span className="spotlight" aria-hidden="true" />
+                  <span className="press" aria-hidden="true" />
 
-                <div className="px-3 py-2 flex items-center justify-end gap-2 text-sm">
-                  <Button
-                    onClick={() => onReplaceClick(it)}
-                    disabled={busyIds.has(it.id) || isUploading}
-                    loading={busyIds.has(it.id)}
-                    loadingText="Working…"
-                    variant="secondary"
-                    size="sm"
-                    className="h-8 px-3"
-                  >
-                    Replace
-                  </Button>
+                  <div className="aspect-[3/2] overflow-hidden relative media">
+                    <CarouselAnimatedImage
+                      src={it.optimizedURL}
+                      alt={`Gallery image ${it.index}`}
+                      badgeContent={`#${it.index}`}
+                      containerClassName="w-full h-full"
+                    />
+                  </div>
 
-                  <input
-                    type="file"
-                    accept="image/*"
-                    hidden
-                    ref={(el) => (replaceInputRefs.current[it.id] = el)}
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      e.target.value = "";
-                      if (f) onReplaceFile(it, f);
-                    }}
-                  />
+                  <div className="px-3 py-2 flex items-center justify-end gap-2 text-sm">
+                    <Button
+                      onClick={() => onReplaceClick(it)}
+                      disabled={itemBusy}
+                      loading={busyIds.has(it.id)}
+                      loadingText="Working…"
+                      variant="secondary"
+                      size="sm"
+                      className="h-8 px-3"
+                    >
+                      Replace
+                    </Button>
 
-                  <Button
-                    onClick={() => onDelete(it)}
-                    disabled={busyIds.has(it.id) || isUploading}
-                    loading={busyIds.has(it.id)}
-                    loadingText="Deleting…"
-                    variant="destructive"
-                    size="sm"
-                    className="h-8 px-3"
-                  >
-                    Delete
-                  </Button>
-                </div>
-              </motion.div>
-            ))}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      hidden
+                      ref={(el) => (replaceInputRefs.current[it.id] = el)}
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        e.target.value = "";
+                        if (f) onReplaceFile(it, f);
+                      }}
+                    />
+
+                    <Button
+                      onClick={() => onDelete(it)}
+                      disabled={itemBusy}
+                      loading={busyIds.has(it.id)}
+                      loadingText="Deleting…"
+                      variant="destructive"
+                      size="sm"
+                      className="h-8 px-3"
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </motion.div>
+              );
+            })}
           </AnimatePresence>
         </div>
       )}
