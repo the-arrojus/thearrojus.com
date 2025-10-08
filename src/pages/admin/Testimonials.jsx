@@ -31,6 +31,7 @@ import {
   ClockIcon,
   CheckCircleIcon,
   ExclamationTriangleIcon,
+  MapPinIcon,
 } from "@heroicons/react/20/solid";
 import { UserCircleIcon } from "@heroicons/react/24/solid";
 
@@ -79,13 +80,11 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(" ");
 }
 
+/* ---------------- InviteRow (Card UI) ---------------- */
 function InviteRow({ invite, status, onToast }) {
   const [copied, setCopied] = useState(false);
   const link = `${window.location.origin}/t/${invite.token}`;
-  const exp =
-    invite.expiresAt instanceof Timestamp
-      ? invite.expiresAt.toDate()
-      : new Date(invite.expiresAt);
+
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(link);
@@ -97,67 +96,92 @@ function InviteRow({ invite, status, onToast }) {
     }
   };
 
+  const handleOpenMap = () => {
+    if (!invite.eventPlace) return;
+    const query = encodeURIComponent(invite.eventPlace);
+    window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, "_blank");
+  };
+
   return (
-    <div className="rounded-xl border p-3 bg-white flex items-start justify-between gap-4">
-      <div className="flex items-start gap-3">
+    <div className="col-span-1 divide-y divide-gray-200 rounded-lg bg-white shadow-sm">
+      {/* Top section */}
+      <div className="flex w-full items-center justify-between space-x-6 p-6">
+        <div className="flex-1 min-w-0">
+          {/* Name */}
+          <h3 className="truncate text-sm font-medium text-gray-900">
+            {invite.clientName || "Unknown Client"}
+          </h3>
+          {/* Event */}
+          <p className="mt-1 truncate text-sm text-gray-500">
+            {invite.event || "Untitled Event"}
+          </p>
+        </div>
+
+        {/* Avatar */}
         {invite.avatarUrl ? (
           <img
+            alt={`${invite.clientName || "Client"} avatar`}
             src={invite.avatarUrl}
-            alt={`${invite.clientName} avatar`}
-            className="h-14 w-14 rounded-full object-cover border"
+            className="size-12 shrink-0 rounded-full object-cover bg-gray-300"
             loading="lazy"
           />
         ) : (
-          <div className="h-14 w-14 rounded-full bg-gray-200 grid place-items-center text-sm text-gray-500">
+          <div className="size-12 shrink-0 rounded-full bg-gray-200 grid place-items-center text-sm text-gray-500 outline -outline-offset-1 outline-black/5">
             {invite.clientName?.[0] || "?"}
           </div>
         )}
-        <div className="space-y-1 text-sm">
-          <div className="font-medium">{invite.clientName}</div>
-          <div className="text-gray-700">{invite.event}</div>
-          {invite.eventPlace && (
-            <div className="text-gray-600">Place: {invite.eventPlace}</div>
-          )}
-          {invite.eventDate && (
-            <div className="text-gray-600">
-              Date:{" "}
-              {(
-                invite.eventDate instanceof Timestamp
-                  ? invite.eventDate.toDate()
-                  : new Date(invite.eventDate)
-              ).toLocaleDateString()}
-            </div>
-          )}
-          <div className="font-mono break-all text-gray-600">{link}</div>
-          <div className="text-xs text-gray-500">
-            Expires: {exp.toLocaleString()}
-          </div>
-          {status === "expired" && (
-            <div className="text-xs font-medium text-orange-600">Expired</div>
-          )}
-        </div>
       </div>
-      <div className="flex items-center gap-2">
-        <span
-          className={
-            "rounded-full px-2 py-1 text-xs " +
-            (status === "done"
-              ? "bg-green-100 text-green-700"
-              : status === "pending"
-              ? "bg-yellow-100 text-yellow-700"
-              : "bg-orange-100 text-orange-700")
-          }
-        >
-          {status === "done" ? "Done" : status === "pending" ? "Pending" : "Expired"}
-        </span>
-        <Button onClick={handleCopy} size="sm" variant="outline" className="text-xs">
-          {copied ? "Copied!" : "Copy"}
-        </Button>
+
+      {/* Bottom row: Location (left) + Copy Link (right) */}
+      <div>
+        <div className="-mt-px flex divide-x divide-gray-200">
+          {/* Location button (opens Google Maps) */}
+          <div className="flex w-0 flex-1">
+            <button
+              type="button"
+              onClick={handleOpenMap}
+              disabled={!invite.eventPlace}
+              className={classNames(
+                "relative -mr-px inline-flex w-0 flex-1 items-center justify-center gap-x-2 rounded-bl-lg border border-transparent py-3 text-sm font-semibold text-gray-900 transition",
+                invite.eventPlace
+                  ? "hover:bg-gray-50 cursor-pointer"
+                  : "cursor-not-allowed text-gray-400"
+              )}
+            >
+              <MapPinIcon aria-hidden="true" className="size-5 text-gray-400" />
+              <span className="truncate">
+                {invite.eventPlace || "Location not set"}
+              </span>
+            </button>
+          </div>
+
+          {/* Copy link */}
+          <div className="-ml-px flex w-0 flex-1">
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="relative inline-flex w-0 flex-1 items-center justify-center gap-x-2 rounded-br-lg border border-transparent py-3 text-sm font-semibold text-gray-900 hover:bg-gray-50 cursor-pointer"
+            >
+              <svg
+                aria-hidden="true"
+                className="size-5 text-gray-400"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <path d="M7 7a3 3 0 0 1 3-3h7a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3h-1v-2h1a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-7a1 1 0 0 0-1 1v1H7V7Zm-3 5a3 3 0 0 1 3-3h7a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-7Zm3-1a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1v-7a1 1 0 0 0-1-1H7Z" />
+              </svg>
+              {copied ? "Copied!" : "Copy Link"}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
+
+
+/* ---------------- Main Component ---------------- */
 export default function AdminTestimonials() {
   const { user } = useAuth();
   const { showToast } = useToast();
@@ -229,11 +253,7 @@ export default function AdminTestimonials() {
   // Center the calendar when it opens
   useEffect(() => {
     if (isCalOpen && calRef.current) {
-      calRef.current.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-        inline: "center",
-      });
+      calRef.current.scrollIntoView({ behavior: "smooth", block: "center", inline: "center" });
     }
   }, [isCalOpen]);
 
@@ -358,7 +378,6 @@ export default function AdminTestimonials() {
   const handleEventPlaceKeyDown = (e) => {
     if (e.key === "Tab") {
       if (hasAutoComplete) {
-        // Accept suggestion but KEEP focus here
         e.preventDefault();
         const full = suggestion;
         setEventPlace(full);
@@ -659,11 +678,7 @@ export default function AdminTestimonials() {
                       {eventDate
                         ? `Selected: ${new Date(eventDate).toLocaleDateString(
                             undefined,
-                            {
-                              year: "numeric",
-                              month: "long",
-                              day: "numeric",
-                            }
+                            { year: "numeric", month: "long", day: "numeric" }
                           )}`
                         : "No date selected"}
                     </span>
@@ -757,7 +772,7 @@ export default function AdminTestimonials() {
       <section className="space-y-4">
         {/* Responsive tabs header */}
         <div>
-          {/* Mobile: select (icons not supported in native select) */}
+          {/* Mobile: select */}
           <div className="grid grid-cols-1 sm:hidden">
             <select
               value={activeTab}
@@ -831,7 +846,7 @@ export default function AdminTestimonials() {
             {pending.length === 0 ? (
               <div className="text-sm text-gray-500">No pending invites.</div>
             ) : (
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {pending.map((inv) => (
                   <InviteRow
                     key={inv.token}
@@ -852,7 +867,7 @@ export default function AdminTestimonials() {
                 No completed testimonials yet.
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {done.map((inv) => (
                   <InviteRow
                     key={inv.token}
@@ -871,7 +886,7 @@ export default function AdminTestimonials() {
             {expired.length === 0 ? (
               <div className="text-sm text-gray-500">No expired invites.</div>
             ) : (
-              <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {expired.map((inv) => (
                   <InviteRow
                     key={inv.token}
