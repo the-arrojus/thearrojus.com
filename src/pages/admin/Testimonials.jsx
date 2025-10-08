@@ -513,7 +513,7 @@ export default function AdminTestimonials() {
               type="text"
               value={clientName}
               onChange={(e) => setClientName(e.target.value)}
-              placeholder="Jane Doe"
+              placeholder="Amulya Vagala"
               className="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-indigo-600"
             />
           </div>
