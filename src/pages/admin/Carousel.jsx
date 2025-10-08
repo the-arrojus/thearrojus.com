@@ -382,7 +382,7 @@ export default function AdminCarousel() {
     <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Gallery</h1>
+        <h1 className="text-2xl font-bold">Carousel</h1>
 
         {/* Upload Button (shadcn-style) */}
         <div className="flex items-center gap-3">
