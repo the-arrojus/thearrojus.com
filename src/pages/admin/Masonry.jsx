@@ -359,7 +359,7 @@ export default function Masonry() {
   const isUploading = overall.active > 0 || busyGlobal;
 
   return (
-    <div ref={containerRef} className="p-6 space-y-6">
+    <div ref={containerRef} className="space-y-8">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Masonry</h1>
         <div className="flex items-center gap-3">

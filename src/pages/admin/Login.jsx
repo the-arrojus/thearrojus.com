@@ -3,10 +3,12 @@ import { useAuth } from "../../context/auth";
 import { useNavigate } from "react-router-dom";
 import { auth } from "../../lib/firebase";
 import { sendPasswordResetEmail, setPersistence, browserLocalPersistence, browserSessionPersistence } from "firebase/auth";
+import { useToast } from "../../components/ToastProvider"; // <-- NEW
 
 export default function AdminLogin() {
   const { login } = useAuth();
   const nav = useNavigate();
+  const { showToast } = useToast(); // <-- NEW
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,9 +23,12 @@ export default function AdminLogin() {
     try {
       await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
       await login(email, password, remember);
+      showToast("Signed in successfully."); // <-- toast survives navigation
       nav("/admin");
     } catch (e) {
-      setErr(e?.message || "Login failed");
+      const msg = e?.message || "Login failed";
+      setErr(msg);
+      showToast(msg, "error");
     } finally {
       setBusy(false);
     }
@@ -32,9 +37,21 @@ export default function AdminLogin() {
   const onForgot = async (e) => {
     e.preventDefault();
     setErr(null); setNote(null);
-    if (!email) { setErr("Enter your email first, then click Forgot password."); return; }
-    try { await sendPasswordResetEmail(auth, email); setNote("Password reset email sent."); }
-    catch (e) { setErr(e?.message || "Could not send reset email."); }
+    if (!email) {
+      const msg = "Enter your email first, then click Forgot password.";
+      setErr(msg);
+      showToast(msg, "error");
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setNote("Password reset email sent.");
+      showToast("Password reset email sent.");
+    } catch (e) {
+      const msg = e?.message || "Could not send reset email.";
+      setErr(msg);
+      showToast(msg, "error");
+    }
   };
 
   return (

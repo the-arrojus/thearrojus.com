@@ -16,7 +16,7 @@ const CA_CITIES = [
   "Lindsay","Livermore","Lodi","Loma Linda","Lomita","Lompoc","Long Beach","Loomis","Los Alamitos","Los Altos","Los Angeles","Los Banos",
   "Los Gatos","Lynwood","Madera","Manhattan Beach","Manteca","Marina","Martinez","Marysville","Maywood","Menlo Park","Merced",
   "Mill Valley","Millbrae","Milpitas","Mission Viejo","Modesto","Monrovia","Montclair","Montebello","Monterey","Monterey Park",
-  "Moorpark","Moraga","Moreno Valley","Morgan Hill","**Mountain House**","Mountain View","Murrieta","Napa","National City","Newark","Newport Beach","Norco",
+  "Moorpark","Moraga","Moreno Valley","Morgan Hill","Mountain View","Murrieta","Napa","National City","Newark","Newport Beach","Norco",
   "North Highlands","North Hollywood","Norwalk","Novato","Oakland","Oakley","Oceanside","Oxnard","Pacifica","Palm Desert","Palm Springs",
   "Palmdale","Palo Alto","Paradise","Paramount","Pasadena","Patterson","Perris","Petaluma","Pico Rivera","Pinole","Pittsburg","Placentia",
   "Placerville","Pleasant Hill","Pleasanton","Pomona","Port Hueneme","Poway","Rancho Cordova","Rancho Cucamonga","Rancho Mirage",
@@ -27,9 +27,27 @@ const CA_CITIES = [
   "San Rafael","San Ramon","Sanger","Santa Ana","Santa Barbara","Santa Clara","Santa Clarita","Santa Cruz","Santa Maria","Santa Monica",
   "Santa Paula","Santa Rosa","Santee","Saratoga","Seal Beach","Seaside","Selma","Sherman Oaks","Simi Valley","Solana Beach","South Gate",
   "South Lake Tahoe","South Pasadena","South San Francisco","Stanton","Stockton","Suisun City","Sunnyvale","Temecula","Temple City",
-  "Thousand Oaks","Torrance","Tracy", "Tracy Hills", "Tulare","Turlock","Tustin","Twentynine Palms","Union City","Upland","Vacaville","Valencia",
+  "Thousand Oaks","Torrance","Tracy","Tulare","Turlock","Tustin","Twentynine Palms","Union City","Upland","Vacaville","Valencia",
   "Vallejo","Victorville","Visalia","Vista","Walnut","Walnut Creek","Watsonville","West Covina","West Hollywood","West Sacramento",
   "Westminster","Whittier","Wildomar","Willow Creek","Woodland","Yorba Linda","Yuba City","Yucaipa",
+
+  "American Canyon","Alturas","Amador City","Anderson","Angels Camp","Arcata","Avalon","Azusa","Bakersfield","Big Bear Lake","Biggs",
+  "Bishop","Blue Lake","Bradbury","California City","Calipatria","Calistoga","Canyon Lake","Capitola","Chowchilla","Cloverdale",
+  "Coalinga","Colma","Colusa","Commerce","Corte Madera","Cotati","Crescent City","Del Rey Oaks","Dorris","Dos Palos","Dunsmuir",
+  "Emeryville","Escalon","Etna","Exeter","Fairfax","Ferndale","Fillmore","Firebaugh","Fort Bragg","Fort Jones","Fortuna","Fowler",
+  "Gonzales","Grand Terrace","Greenfield","Gridley","Grover Beach","Guadalupe","Gustine","Half Moon Bay","Hawaiian Gardens",
+  "Healdsburg","Hidden Hills","Hillsborough","Holtville","Hughson","Huron","Imperial","Indian Wells","Industry","Ione","Isleton",
+  "Jackson","Jurupa Valley","Kerman","King City","Kingsburg","Lakeport","Live Oak","Livingston","Loyalton","Malibu","Mammoth Lakes",
+  "McFarland","Mendota","Menifee","Montague","Monte Sereno","Morro Bay","Mount Shasta","Mountain House","Needles","Nevada City",
+  "Oakdale","Ojai","Ontario","Orange","Orinda","Orland","Oroville","Pacific Grove","Palos Verdes Estates","Parlier",
+  "Paso Robles","Piedmont","Pismo Beach","Porterville","Portola","Portola Valley","Rio Dell","Rolling Hills","Rolling Hills Estates",
+  "Saint Helena","San Joaquin","San Juan Bautista","San Juan Capistrano","San Marino","Sand City","Santa Fe Springs","Sausalito",
+  "Scotts Valley","Sebastopol","Shafter","Shasta Lake","Sierra Madre","Signal Hill","Soledad","Solvang","Sonoma","Sonora",
+  "South El Monte","Susanville","Sutter Creek","Taft","Tehachapi","Tehama","Tiburon","Trinidad","Truckee","Tulelake","Ukiah",
+  "Vernon","Villa Park","Wasco","Westlake Village","Wheatland","Willits","Willows","Windsor","Winters","Woodlake","Woodside",
+  "Yountville","Yreka","Yucca Valley",
+
+  "San Buenaventura (Ventura)"
 ];
 
 export default CA_CITIES;

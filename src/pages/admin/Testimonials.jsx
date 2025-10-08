@@ -1,9 +1,9 @@
-// src/pages/AdminTestimonials.jsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../../context/auth";
 import { db, storage } from "../../lib/firebase";
 import Button from "../../components/Button";
 import AvatarCropper from "../../components/AvatarCropper";
+import { useToast } from "../../components/ToastProvider";
 import {
   collection,
   doc,
@@ -71,7 +71,7 @@ function getMonthGrid(viewYear, viewMonth, selectedYmd) {
   return days;
 }
 
-function InviteRow({ invite, status }) {
+function InviteRow({ invite, status, onToast }) {
   const [copied, setCopied] = useState(false);
   const link = `${window.location.origin}/t/${invite.token}`;
   const exp =
@@ -82,8 +82,11 @@ function InviteRow({ invite, status }) {
     try {
       await navigator.clipboard.writeText(link);
       setCopied(true);
+      onToast?.("Link copied to clipboard");
       setTimeout(() => setCopied(false), 1200);
-    } catch {}
+    } catch {
+      onToast?.("Failed to copy link", "error");
+    }
   };
 
   return (
@@ -149,6 +152,8 @@ function InviteRow({ invite, status }) {
 
 export default function AdminTestimonials() {
   const { user } = useAuth();
+  const { showToast } = useToast();
+
   const [eventName, setEventName] = useState("");
   const [clientName, setClientName] = useState("");
   const [eventPlace, setEventPlace] = useState(""); // ghost autocomplete
@@ -280,10 +285,13 @@ export default function AdminTestimonials() {
         );
         setStatuses(Object.fromEntries(checks));
       },
-      (e) => setErr(e?.message || "Failed to load invites")
+      (e) => {
+        setErr(e?.message || "Failed to load invites");
+        showToast(e?.message || "Failed to load invites", "error");
+      }
     );
     return () => unsub();
-  }, [user]);
+  }, [user, showToast]);
 
   const ensureToken = () => {
     if (!inviteToken) {
@@ -315,7 +323,10 @@ export default function AdminTestimonials() {
     try {
       if (!inviteToken) return;
       await deleteObject(ref(storage, `avatars/${inviteToken}/avatar.jpg`));
-    } catch {}
+      showToast("Photo removed");
+    } catch {
+      showToast("Failed to remove photo", "error");
+    }
     setAvatarUrl("");
     setRawAvatarFile(null);
     setShowCropper(false);
@@ -352,7 +363,6 @@ export default function AdminTestimonials() {
           }
         });
       }
-      // else let Tab move normally
     }
   };
   /* ----------------------------------------------- */
@@ -363,11 +373,15 @@ export default function AdminTestimonials() {
 
     // Required fields
     if (!eventName.trim() || !clientName.trim()) {
-      setErr("Event and Client name are required.");
+      const msg = "Event and Client name are required.";
+      setErr(msg);
+      showToast(msg, "error");
       return;
     }
     if (!avatarUrl) {
-      setErr("Client avatar is required.");
+      const msg = "Client avatar is required.";
+      setErr(msg);
+      showToast(msg, "error");
       return;
     }
 
@@ -400,8 +414,11 @@ export default function AdminTestimonials() {
       setRawAvatarFile(null);
       setShowCropper(false);
       closeCalendar();
+
+      showToast("Invite created. Link expires in 24 hours.");
     } catch (e) {
       setErr(e?.message || "Failed to create invite");
+      showToast(e?.message || "Failed to create invite", "error");
     } finally {
       setBusy(false);
     }
@@ -422,7 +439,7 @@ export default function AdminTestimonials() {
     <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Testimonials</h1>
+        <h1 className="text-2xl font-bold">Testimonials</h1>
       </div>
 
       {/* --- Create Invite --- */}
@@ -696,7 +713,7 @@ export default function AdminTestimonials() {
                 value={eventPlace}
                 onChange={(e) => setEventPlace(e.target.value)}
                 onKeyDown={handleEventPlaceKeyDown} // Tab to accept (and stay)
-                placeholder="Venue / City"
+                placeholder="e.g., San Fransisco"
                 autoComplete="off"
                 className="block w-full rounded-md border border-gray-300 bg-transparent px-3 py-1.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-indigo-600"
               />
@@ -730,7 +747,7 @@ export default function AdminTestimonials() {
         ) : (
           <div className="space-y-3">
             {pending.map((inv) => (
-              <InviteRow key={inv.token} invite={inv} status="pending" />
+              <InviteRow key={inv.token} invite={inv} status="pending" onToast={showToast} />
             ))}
           </div>
         )}
@@ -746,7 +763,7 @@ export default function AdminTestimonials() {
         ) : (
           <div className="space-y-3">
             {done.map((inv) => (
-              <InviteRow key={inv.token} invite={inv} status="done" />
+              <InviteRow key={inv.token} invite={inv} status="done" onToast={showToast} />
             ))}
           </div>
         )}
@@ -762,7 +779,7 @@ export default function AdminTestimonials() {
             {invites
               .filter((i) => statuses[i.token] === "expired")
               .map((inv) => (
-                <InviteRow key={inv.token} invite={inv} status="expired" />
+                <InviteRow key={inv.token} invite={inv} status="expired" onToast={showToast} />
               ))}
           </div>
         </details>
@@ -776,11 +793,16 @@ export default function AdminTestimonials() {
             setRawAvatarFile(null);
           }}
           onCropped={async (blob) => {
-            const token = ensureToken();
-            const url = await uploadAvatarBlob(blob, token);
-            setShowCropper(false);
-            setRawAvatarFile(null);
-            setAvatarUrl(url);
+            try {
+              const token = ensureToken();
+              const url = await uploadAvatarBlob(blob, token);
+              setShowCropper(false);
+              setRawAvatarFile(null);
+              setAvatarUrl(url);
+              showToast("Photo updated");
+            } catch {
+              showToast("Failed to upload photo", "error");
+            }
           }}
         />
       )}

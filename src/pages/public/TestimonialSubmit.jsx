@@ -3,7 +3,9 @@ import { useParams } from "react-router-dom";
 import { db } from "../../lib/firebase.js";
 import { doc, getDoc, setDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 import FullScreenLoader from "../../components/FullScreenLoader";
-import Button from "../../components/Button"; // <-- shadcn-style button
+import Button from "../../components/Button";
+// ✅ use the global toast hook
+import { useToast } from "../../components/ToastProvider";
 
 function StarInput({ value, onChange }) {
   return (
@@ -37,6 +39,9 @@ export default function TestimonialSubmit() {
   const [description, setDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // ✅ Global toast
+  const { showToast } = useToast();
+
   const expired = useMemo(() => {
     if (!invite?.expiresAt) return true;
     try {
@@ -53,14 +58,18 @@ export default function TestimonialSubmit() {
   useEffect(() => {
     (async () => {
       if (!token) {
-        setError("This link is invalid.");
+        const msg = "This link is invalid.";
+        setError(msg);
         setLoading(false);
+        showToast(msg, "error");
         return;
       }
       try {
         const invSnap = await getDoc(doc(db, "testimonialInvites", token));
         if (!invSnap.exists()) {
-          setError("This link is invalid.");
+          const msg = "This link is invalid.";
+          setError(msg);
+          showToast(msg, "error");
           return;
         }
         setInvite(invSnap.data());
@@ -68,17 +77,22 @@ export default function TestimonialSubmit() {
         try {
           const tSnap = await getDoc(doc(db, "testimonials", token));
           setAlreadyUsed(tSnap.exists());
+          if (tSnap.exists()) {
+            showToast("This link has already been used.", "error");
+          }
         } catch {
           setAlreadyUsed(false);
         }
       } catch (e) {
         console.error("Invite load error:", e);
-        setError("Could not load invite.");
+        const msg = "Could not load invite.";
+        setError(msg);
+        showToast(msg, "error");
       } finally {
         setLoading(false);
       }
     })();
-  }, [token]);
+  }, [token, showToast]);
 
   const onSubmit = async (e) => {
     e.preventDefault();
@@ -86,14 +100,18 @@ export default function TestimonialSubmit() {
     if (submitting) return;
 
     if (expired || alreadyUsed) {
-      setError("This link has already been used.");
+      const msg = "This link has already been used.";
+      setError(msg);
+      showToast(msg, "error");
       return;
     }
 
     const fullName = invite?.clientName?.trim();
     const event = invite?.event?.trim();
     if (!fullName || !event || !description.trim() || stars < 1 || stars > 5) {
-      setError("Please add a rating (1–5) and description.");
+      const msg = "Please add a rating (1–5) and description.";
+      setError(msg);
+      showToast(msg, "error");
       return;
     }
 
@@ -109,9 +127,12 @@ export default function TestimonialSubmit() {
       });
       setSubmitted(true);
       setAlreadyUsed(true);
+      showToast("Thank you! Your testimonial has been recorded.");
     } catch (e) {
       console.error("Submission error:", e);
-      setError("Submission failed. This link may have already been used.");
+      const msg = "Submission failed. This link may have already been used.";
+      setError(msg);
+      showToast(msg, "error");
     } finally {
       setSubmitting(false);
     }
