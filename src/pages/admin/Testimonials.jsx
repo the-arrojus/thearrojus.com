@@ -33,6 +33,7 @@ import {
   CheckCircleIcon,
   ExclamationTriangleIcon,
   MapPinIcon,
+  XCircleIcon
 } from "@heroicons/react/20/solid";
 import { UserCircleIcon } from "@heroicons/react/24/solid";
 
@@ -173,7 +174,7 @@ function InviteRow({ invite, status, onToast }) {
         )}
       </div>
 
-      {/* Bottom row: Location + Copy Link */}
+      {/* Bottom row */}
       <div>
         <div className="-mt-px flex divide-x divide-gray-200">
           {/* Location button */}
@@ -195,96 +196,98 @@ function InviteRow({ invite, status, onToast }) {
               />
               <span className="truncate">{invite.eventPlace || "Location not set"}</span>
 
-              {/* underline only on hover */}
               {invite.eventPlace && (
                 <span className="pointer-events-none absolute inset-x-6 bottom-2 h-px bg-gradient-to-r from-transparent via-gray-400 to-transparent transform scale-x-0 origin-center transition-transform duration-300 group-hover/location:scale-x-100" />
               )}
             </button>
           </div>
 
-          {/* Copy Link — enhanced with green success effects */}
+          {/* Right side */}
           <div className="-ml-px flex w-0 flex-1 relative">
-            {/* success halo (appears only when copied) */}
-            {copied && (
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0 rounded-br-xl bg-green-300/30 animate-ping"
-              />
+            {status === "expired" ? (
+              <div className="inline-flex w-0 flex-1 items-center justify-center gap-2 rounded-br-xl border border-transparent py-3 text-sm font-semibold text-red-700 bg-red-50 cursor-not-allowed select-none">
+                <XCircleIcon className="size-5 text-red-600" aria-hidden="true" />
+                Expired
+              </div>
+            ) : status === "done" ? (
+              <div className="inline-flex w-0 flex-1 items-center justify-center gap-2 rounded-br-xl border border-transparent py-3 text-sm font-semibold text-green-700 bg-green-50 select-none">
+                <CheckCircleIcon className="size-5 text-green-600" aria-hidden="true" />
+                Completed
+              </div>
+            ) : (
+              <>
+                {copied && (
+                  <span
+                    aria-hidden="true"
+                    className="pointer-events-none absolute inset-0 rounded-br-xl bg-green-300/30 animate-ping"
+                  />
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleCopy}
+                  className={classNames(
+                    "group/copy relative inline-flex w-0 flex-1 items-center justify-center gap-x-2 rounded-br-xl border border-transparent py-3 text-sm font-semibold transition-all duration-200 focus:outline-none",
+                    "hover:bg-gray-50 active:scale-[0.99]",
+                    copied
+                      ? "bg-green-50 text-green-700 ring-1 ring-green-200 translate-y-[-1px]"
+                      : "text-gray-900"
+                  )}
+                  aria-live="polite"
+                >
+                  {copied ? (
+                    <svg
+                      aria-hidden="true"
+                      className="size-5 text-green-500 transition-transform duration-300 scale-110 rotate-[8deg]"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <path d="M12 2a10 10 0 1 0 .001 20.001A10 10 0 0 0 12 2Zm4.28 7.22a1 1 0 0 1 0 1.41l-5 5a1 1 0 0 1-1.41 0l-2-2a1 1 0 1 1 1.41-1.41l1.29 1.29 4.3-4.3a1 1 0 0 1 1.41 0Z" />
+                    </svg>
+                  ) : (
+                    <svg
+                      aria-hidden="true"
+                      className="size-5 text-gray-400 transition-transform duration-200"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                    >
+                      <path d="M7 7a3 3 0 0 1 3-3h7a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3h-1v-2h1a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-7a1 1 0 0 0-1 1v1H7V7Zm-3 5a3 3 0 0 1 3-3h7a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-7Zm3-1a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1v-7a1 1 0 0 0-1-1H7Z" />
+                    </svg>
+                  )}
+
+                  <span className={classNames("transition-transform", copied ? "animate-pulse" : "")}>
+                    {copied ? "Copied!" : "Copy Link"}
+                  </span>
+
+                  <span
+                    className={classNames(
+                      "pointer-events-none absolute inset-x-6 bottom-2 h-px transform scale-x-0 origin-center transition-transform duration-300 group-hover/copy:scale-x-100",
+                      copied
+                        ? "bg-gradient-to-r from-transparent via-green-500 to-transparent"
+                        : "bg-gradient-to-r from-transparent via-gray-400 to-transparent"
+                    )}
+                  />
+
+                  {copied && (
+                    <span
+                      aria-hidden="true"
+                      className="absolute -top-1 right-6 text-green-500 animate-bounce"
+                    >
+                      <svg viewBox="0 0 24 24" className="size-4" fill="currentColor">
+                        <path d="M12 2l1.8 4.2L18 8l-4.2 1.8L12 14l-1.8-4.2L6 8l4.2-1.8L12 2z" />
+                      </svg>
+                    </span>
+                  )}
+                </button>
+              </>
             )}
-
-            <button
-              type="button"
-              onClick={handleCopy}
-              className={classNames(
-                "group/copy relative inline-flex w-0 flex-1 items-center justify-center gap-x-2 rounded-br-xl border border-transparent py-3 text-sm font-semibold transition-all duration-200 focus:outline-none",
-                "hover:bg-gray-50 active:scale-[0.99]",
-                copied
-                  ? // when copied, go green and lift a bit
-                    "bg-green-50 text-green-700 ring-1 ring-green-200 translate-y-[-1px]"
-                  : "text-gray-900"
-              )}
-              aria-live="polite"
-            >
-              {/* icon swap: clipboard -> check badge */}
-              {copied ? (
-                <svg
-                  aria-hidden="true"
-                  className="size-5 text-green-500 transition-transform duration-300 scale-110 rotate-[8deg]"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  {/* check-circle icon */}
-                  <path d="M12 2a10 10 0 1 0 .001 20.001A10 10 0 0 0 12 2Zm4.28 7.22a1 1 0 0 1 0 1.41l-5 5a1 1 0 0 1-1.41 0l-2-2a1 1 0 1 1 1.41-1.41l1.29 1.29 4.3-4.3a1 1 0 0 1 1.41 0Z" />
-                </svg>
-              ) : (
-                <svg
-                  aria-hidden="true"
-                  className="size-5 text-gray-400 transition-transform duration-200"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path d="M7 7a3 3 0 0 1 3-3h7a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3h-1v-2h1a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-7a1 1 0 0 0-1 1v1H7V7Zm-3 5a3 3 0 0 1 3-3h7a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-7Zm3-1a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1v-7a1 1 0 0 0-1-1H7Z" />
-                </svg>
-              )}
-
-              <span
-                className={classNames(
-                  "transition-transform",
-                  copied ? "animate-pulse" : ""
-                )}
-              >
-                {copied ? "Copied!" : "Copy Link"}
-              </span>
-
-              {/* underline only on hover; turns green on success */}
-              <span
-                className={classNames(
-                  "pointer-events-none absolute inset-x-6 bottom-2 h-px transform scale-x-0 origin-center transition-transform duration-300 group-hover/copy:scale-x-100",
-                  copied
-                    ? "bg-gradient-to-r from-transparent via-green-500 to-transparent"
-                    : "bg-gradient-to-r from-transparent via-gray-400 to-transparent"
-                )}
-              />
-
-              {/* confetti spark — tiny star that pops on success */}
-              {copied && (
-                <span
-                  aria-hidden="true"
-                  className="absolute -top-1 right-6 text-green-500 animate-bounce"
-                >
-                  {/* little 4-point star */}
-                  <svg viewBox="0 0 24 24" className="size-4" fill="currentColor">
-                    <path d="M12 2l1.8 4.2L18 8l-4.2 1.8L12 14l-1.8-4.2L6 8l4.2-1.8L12 2z" />
-                  </svg>
-                </span>
-              )}
-            </button>
           </div>
         </div>
       </div>
     </div>
   );
 }
+
 
 /* ---------------- Main Component ---------------- */
 export default function AdminTestimonials() {
@@ -423,6 +426,7 @@ export default function AdminTestimonials() {
         showToast(e?.message || "Failed to load invites", "error");
       }
     );
+    return unsub;
   }, [user, showToast]);
 
   const ensureToken = () => {
@@ -541,7 +545,6 @@ export default function AdminTestimonials() {
       setAvatarUrl("");
       setRawAvatarFile(null);
       setShowCropper(false);
-      closeCalendar();
 
       showToast("Invite created. Link expires in 24 hours.");
     } catch (e2) {
