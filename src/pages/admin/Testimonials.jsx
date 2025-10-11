@@ -89,6 +89,7 @@ const MotionButton = motion.button;
 function InviteRow({ invite, status, onToast }) {
   const [copied, setCopied] = useState(false);
   const [visible, setVisible] = useState(false);
+  const [expiryText, setExpiryText] = useState("");
   const cardRef = useRef(null);
   const link = `${window.location.origin}/t/${invite.token}`;
 
@@ -102,7 +103,25 @@ function InviteRow({ invite, status, onToast }) {
     obs.observe(el);
     return () => obs.disconnect();
   }, []);
+  
+  useEffect(() => {
+    const updateExpiry = () => {
+      const now = Date.now();
+      const expiryMs = invite.expiresAt?.seconds * 1000 + (invite.expiresAt?.nanoseconds || 0) / 1e6;
+      const diffMs = expiryMs - now;
+      const diffHr = Math.floor(diffMs / (1000 * 60 * 60));
+      if (diffHr <= 0) {
+        setExpiryText("Expired");
+      } else {
+        setExpiryText(`${diffHr}Hr`);
+      }
+    };
 
+    updateExpiry();
+    const interval = setInterval(updateExpiry, 60000); // update every minute
+    return () => clearInterval(interval);
+  }, [invite.expiresAt]);
+  
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(link);
@@ -119,7 +138,9 @@ function InviteRow({ invite, status, onToast }) {
     const query = encodeURIComponent(invite.eventPlace);
     window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, "_blank");
   };
-
+  
+  console.log(invite);
+   
   return (
     <div
       ref={cardRef}
@@ -151,10 +172,22 @@ function InviteRow({ invite, status, onToast }) {
     >
       {/* Top section */}
       <div className="flex w-full items-center justify-between space-x-6 p-6">
-        <div className="flex-1 min-w-0">
-          <h3 className="truncate text-sm font-semibold text-gray-900 tracking-tight">
-            {invite.clientName || "Unknown Client"}
-          </h3>
+        <div className="flex-1 truncate">
+          <div className="flex items-center space-x-3">
+            <h3 className="truncate text-sm font-medium text-gray-900">
+              {invite.clientName || "Unknown Client"}
+            </h3>
+            {
+              expiryText != "Expired" ?
+                (
+                  <span className="inline-flex shrink-0 items-center rounded-full bg-green-50 px-1.5 py-0.5 text-xs font-medium text-green-700 inset-ring inset-ring-green-600/20">
+                    {expiryText}
+                  </span>
+                )
+                : ""
+            }
+          </div>
+          
           <p className="mt-1 truncate text-sm text-gray-500">
             {invite.event || "Untitled Event"}
           </p>
