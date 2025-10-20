@@ -6,6 +6,8 @@ import {
   orderBy,
   query,
   limit as fsLimit,
+  getDoc,
+  doc as fsDoc,
 } from "firebase/firestore";
 
 function classNames(...classes) {
@@ -20,18 +22,12 @@ function makeHandle(name = "") {
     .replace(/[\s_]+/g, "");
 }
 
-const FALLBACK_AVATAR =
-  "https://images.unsplash.com/photo-1527980965255-d3b416303d12?q=80&w=256&auto=format&fit=facearea&facepad=2";
-
 function StarRating({ value = 5 }) {
   const count = Math.max(0, Math.min(5, Number(value) || 0));
   return (
     <div className="flex items-center gap-1" aria-label={`${count} out of 5 stars`}>
       {Array.from({ length: 5 }).map((_, i) => (
-        <span
-          key={i}
-          className={i < count ? "text-yellow-500" : "text-gray-300"}
-        >
+        <span key={i} className={i < count ? "text-yellow-500" : "text-gray-300"}>
           ★
         </span>
       ))}
@@ -40,18 +36,26 @@ function StarRating({ value = 5 }) {
 }
 
 /**
- * Map Firestore testimonial doc → UI shape
- * Your TestimonialSubmit writes: token, fullName, event, stars, description, submittedAt
+ * Map Firestore testimonial doc → base UI shape.
+ * Testimonial docs include: token, fullName, event, stars, description, submittedAt
+ * We will fetch avatarUrl from testimonialInvites/{token}.
  */
-function mapDocToTestimonial(d) {
+function mapDocToBase(d) {
   const body = d.description ?? "";
   const name = d.fullName ?? "Anonymous";
   const handle = makeHandle(name);
-  const imageUrl = FALLBACK_AVATAR; // No photo in schema — use fallback (or plug your own)
   const event = d.event ?? null;
   const stars = d.stars ?? 5;
   const submittedAt = d.submittedAt ?? null;
-  return { body, author: { name, handle, imageUrl }, event, stars, submittedAt };
+  const token = d.token ?? null;
+  return {
+    body,
+    author: { name, handle, imageUrl: "" }, // filled after avatar lookup
+    event,
+    stars,
+    submittedAt,
+    token,
+  };
 }
 
 export default function PublicTestimonials({ max = 24 }) {
@@ -69,10 +73,47 @@ export default function PublicTestimonials({ max = 24 }) {
 
     const unsub = onSnapshot(
       q,
-      (snap) => {
-        const docs = snap.docs.map((d) => mapDocToTestimonial(d.data()));
-        setItems(docs);
-        setLoading(false);
+      async (snap) => {
+        try {
+          const base = snap.docs.map((d) => mapDocToBase(d.data()));
+
+          // Collect tokens and look up avatarUrl from testimonialInvites/{token}
+          const tokens = Array.from(
+            new Set(base.map((t) => t.token).filter(Boolean))
+          );
+
+          // Fetch invites one-by-one (safe for small lists; can batch if needed)
+          const avatarMap = Object.create(null);
+          await Promise.all(
+            tokens.map(async (tkn) => {
+              try {
+                const invRef = fsDoc(db, "testimonialInvites", tkn);
+                const invSnap = await getDoc(invRef);
+                if (invSnap.exists()) {
+                  const inv = invSnap.data();
+                  if (inv?.avatarUrl) avatarMap[tkn] = inv.avatarUrl;
+                }
+              } catch {
+                // ignore individual fetch errors; leave avatar undefined
+              }
+            })
+          );
+
+          // Merge avatars into items
+          const merged = base.map((t) => ({
+            ...t,
+            author: {
+              ...t.author,
+              imageUrl: t.token ? avatarMap[t.token] || "" : "",
+            },
+          }));
+
+          setItems(merged);
+          setLoading(false);
+        } catch (e) {
+          setError(e?.message || "Failed to load testimonials");
+          setLoading(false);
+        }
       },
       (e) => {
         setError(e?.message || "Failed to load testimonials");
@@ -163,18 +204,20 @@ export default function PublicTestimonials({ max = 24 }) {
                 <p>{`“${featuredTestimonial.body}”`}</p>
               </blockquote>
               <figcaption className="flex flex-wrap items-center gap-x-4 gap-y-4 border-t border-gray-900/10 px-6 py-4 sm:flex-nowrap">
-                <img
-                  alt={featuredTestimonial.author.name}
-                  src={featuredTestimonial.author.imageUrl}
-                  className="size-10 flex-none rounded-full bg-gray-50"
-                />
+                {/* Only render <img> if we have a URL */}
+                {featuredTestimonial.author.imageUrl ? (
+                  <img
+                    alt={featuredTestimonial.author.name}
+                    src={featuredTestimonial.author.imageUrl}
+                    className="size-10 flex-none rounded-full bg-gray-50 object-cover"
+                  />
+                ) : (
+                  <div className="size-10 flex-none rounded-full bg-gray-200" />
+                )}
                 <div className="flex-auto">
                   <div className="font-semibold text-gray-900">
                     {featuredTestimonial.author.name}
                   </div>
-                  {featuredTestimonial.author.handle && (
-                    <div className="text-gray-600">@{featuredTestimonial.author.handle}</div>
-                  )}
                   {featuredTestimonial.event && (
                     <div className="text-xs text-gray-500 mt-0.5">
                       {featuredTestimonial.event}
@@ -212,16 +255,17 @@ export default function PublicTestimonials({ max = 24 }) {
                         <p>{`“${t.body}”`}</p>
                       </blockquote>
                       <figcaption className="mt-6 flex items-center gap-x-4">
-                        <img
-                          alt={t.author.name}
-                          src={t.author.imageUrl}
-                          className="size-10 rounded-full bg-gray-50"
-                        />
+                        {t.author.imageUrl ? (
+                          <img
+                            alt={t.author.name}
+                            src={t.author.imageUrl}
+                            className="size-10 rounded-full bg-gray-50 object-cover"
+                          />
+                        ) : (
+                          <div className="size-10 rounded-full bg-gray-200" />
+                        )}
                         <div>
                           <div className="font-semibold text-gray-900">{t.author.name}</div>
-                          {t.author.handle && (
-                            <div className="text-gray-600">@{t.author.handle}</div>
-                          )}
                           {t.event && (
                             <div className="text-xs text-gray-500 mt-0.5">{t.event}</div>
                           )}
