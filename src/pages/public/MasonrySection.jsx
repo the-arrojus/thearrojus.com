@@ -116,7 +116,7 @@ function PictureWithPlaceholder({ img, priority = false }) {
         sizes="(max-width: 750px) 100vw, (max-width: 900px) 50vw, 33vw"
         onLoad={() => setLoaded(true)}
         onError={(e) => {
-          e.currentTarget.src = "/images/fallback.jpg"; // your fallback image
+          e.currentTarget.src = "/images/fallback.jpg";
           e.currentTarget.style.objectFit = "contain";
         }}
         className={`masonry-img ${loaded ? "is-loaded" : ""}`}
