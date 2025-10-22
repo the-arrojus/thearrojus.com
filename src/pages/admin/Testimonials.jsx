@@ -44,7 +44,7 @@ function makeToken() {
   return crypto.randomUUID().replace(/-/g, "");
 }
 
-/* ---------------- Calendar helpers ---------------- */
+/* ---------------- Calendar + String helpers ---------------- */
 function fmtYmd(date) {
   const y = date.getFullYear();
   const m = `${date.getMonth() + 1}`.padStart(2, "0");
@@ -56,6 +56,13 @@ function fmtYmd(date) {
 function parseYmdLocal(ymd) {
   const [y, m, d] = ymd.split("-").map((s) => parseInt(s, 10));
   return new Date(y, m - 1, d, 0, 0, 0, 0);
+}
+
+/** Make Every Word's First Letter Uppercase (handles hyphens & apostrophes) */
+function toTitleCase(str) {
+  return (str || "")
+    .toLowerCase()
+    .replace(/(\b\w|[-']\w)/g, (m) => m.toUpperCase());
 }
 
 function weekdayMon0(date) {
@@ -125,7 +132,7 @@ function InviteRow({ invite, status, onToast }) {
     };
 
     updateExpiry();
-    const interval = setInterval(updateExpiry, 60000); // update every minute
+    const interval = setInterval(updateExpiry, 60000); // every minute
     return () => clearInterval(interval);
   }, [invite.expiresAt]);
   
@@ -145,8 +152,6 @@ function InviteRow({ invite, status, onToast }) {
     const query = encodeURIComponent(invite.eventPlace);
     window.open(`https://www.google.com/maps/search/?api=1&query=${query}`, "_blank");
   };
-  
-  console.log(invite);
   
   return (
     <div
@@ -184,15 +189,12 @@ function InviteRow({ invite, status, onToast }) {
             <h3 className="truncate text-sm font-medium text-gray-900">
               {invite.clientName || "Unknown Client"}
             </h3>
-            {
-              expiryText !== "Expired" ?
-                (
-                  <span className="inline-flex shrink-0 items-center rounded-full bg-green-50 px-1.5 py-0.5 text-xs font-medium text-green-700 inset-ring inset-ring-green-600/20">
-                    {expiryText}
-                  </span>
-                )
-                : ""
-            }
+            {/* Hide expiry badge for DONE cards */}
+            {status !== "done" && expiryText !== "Expired" && (
+              <span className="inline-flex shrink-0 items-center rounded-full bg-green-50 px-1.5 py-0.5 text-xs font-medium text-green-700 inset-ring inset-ring-green-600/20">
+                {expiryText}
+              </span>
+            )}
           </div>
           
           <p className="mt-1 truncate text-sm text-gray-500">
@@ -528,7 +530,7 @@ export default function AdminTestimonials() {
       if (hasAutoComplete) {
         e.preventDefault();
         const full = suggestion;
-        setEventPlace(full);
+        setEventPlace(toTitleCase(full)); // keep capitalization consistent
         requestAnimationFrame(() => {
           const el = eventPlaceInputRef.current;
           if (el) {
@@ -697,8 +699,8 @@ export default function AdminTestimonials() {
             <input
               type="text"
               value={eventName}
-              onChange={(e) => setEventName(e.target.value)}
-              placeholder="e.g., Wedding of Sandeep & Amulya"
+              onChange={(e) => setEventName(toTitleCase(e.target.value))}
+              placeholder="e.g., Wedding Of Sandeep & Amulya"
               className="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-indigo-600"
             />
           </div>
@@ -711,7 +713,7 @@ export default function AdminTestimonials() {
             <input
               type="text"
               value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
+              onChange={(e) => setClientName(toTitleCase(e.target.value))}
               placeholder="Amulya Vagala"
               className="mt-2 block w-full rounded-md border border-gray-300 bg-white px-3 py-1.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-indigo-600"
             />
@@ -887,7 +889,7 @@ export default function AdminTestimonials() {
                 ref={eventPlaceInputRef}
                 type="text"
                 value={eventPlace}
-                onChange={(e) => setEventPlace(e.target.value)}
+                onChange={(e) => setEventPlace(toTitleCase(e.target.value))}
                 onKeyDown={handleEventPlaceKeyDown}
                 placeholder="e.g., San Francisco"
                 autoComplete="off"
