@@ -51,6 +51,13 @@ function fmtYmd(date) {
   const d = `${date.getDate()}`.padStart(2, "0");
   return `${y}-${m}-${d}`;
 }
+
+/** Parse 'YYYY-MM-DD' as a LOCAL date (avoid UTC off-by-one) */
+function parseYmdLocal(ymd) {
+  const [y, m, d] = ymd.split("-").map((s) => parseInt(s, 10));
+  return new Date(y, m - 1, d, 0, 0, 0, 0);
+}
+
 function weekdayMon0(date) {
   return (date.getDay() + 6) % 7; // Monday=0
 }
@@ -140,7 +147,7 @@ function InviteRow({ invite, status, onToast }) {
   };
   
   console.log(invite);
-   
+  
   return (
     <div
       ref={cardRef}
@@ -178,7 +185,7 @@ function InviteRow({ invite, status, onToast }) {
               {invite.clientName || "Unknown Client"}
             </h3>
             {
-              expiryText != "Expired" ?
+              expiryText !== "Expired" ?
                 (
                   <span className="inline-flex shrink-0 items-center rounded-full bg-green-50 px-1.5 py-0.5 text-xs font-medium text-green-700 inset-ring inset-ring-green-600/20">
                     {expiryText}
@@ -284,7 +291,7 @@ function InviteRow({ invite, status, onToast }) {
                       viewBox="0 0 24 24"
                       fill="currentColor"
                     >
-                      <path d="M7 7a3 3 0 0 1 3-3h7a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3h-1v-2h1a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-7a1 1 0 0 0-1 1v1H7V7Zm-3 5a3 3 0 0 1 3-3h7a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-7Zm3-1a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1v-7a1 1 0 0 0-1-1H7Z" />
+                      <path d="M7 7a3 3 0 0 1 3-3h7a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-7Zm3-1a1 1 0 0 0-1 1v7a1 1 0 0 0 1 1h7a1 1 0 0 0 1-1v-7a1 1 0 0 0-1-1H7Z" />
                     </svg>
                   )}
 
@@ -354,7 +361,7 @@ export default function AdminTestimonials() {
   const eventPlaceInputRef = useRef(null);
 
   // Month view follows selected date (or today)
-  const base = eventDate ? new Date(eventDate) : new Date();
+  const base = eventDate ? parseYmdLocal(eventDate) : new Date();
   const [viewYear, setViewYear] = useState(base.getFullYear());
   const [viewMonth, setViewMonth] = useState(base.getMonth());
 
@@ -373,7 +380,7 @@ export default function AdminTestimonials() {
   );
 
   const openCalendar = () => {
-    const d = eventDate ? new Date(eventDate) : new Date();
+    const d = eventDate ? parseYmdLocal(eventDate) : new Date();
     setViewYear(d.getFullYear());
     setViewMonth(d.getMonth());
     setIsCalOpen(true);
@@ -556,7 +563,9 @@ export default function AdminTestimonials() {
     try {
       const token = ensureToken();
       const expiresAt = Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000);
-      const eventDateTs = eventDate ? Timestamp.fromDate(new Date(eventDate)) : null;
+
+      // Parse YYYY-MM-DD as LOCAL date to avoid off-by-one
+      const eventDateTs = eventDate ? Timestamp.fromDate(parseYmdLocal(eventDate)) : null;
 
       await setDoc(doc(db, "testimonialInvites", token), {
         token,
@@ -725,7 +734,7 @@ export default function AdminTestimonials() {
               >
                 <span className={eventDate ? "" : "text-gray-500"}>
                   {eventDate
-                    ? new Date(eventDate).toLocaleDateString(undefined, {
+                    ? parseYmdLocal(eventDate).toLocaleDateString(undefined, {
                         year: "numeric",
                         month: "long",
                         day: "numeric",
@@ -813,7 +822,7 @@ export default function AdminTestimonials() {
                   <div className="mt-4 flex items-center justify-between border-t pt-3 text-xs text-gray-600">
                     <span>
                       {eventDate
-                        ? `Selected: ${new Date(eventDate).toLocaleDateString(undefined, {
+                        ? `Selected: ${parseYmdLocal(eventDate).toLocaleDateString(undefined, {
                             year: "numeric",
                             month: "long",
                             day: "numeric",
@@ -880,7 +889,7 @@ export default function AdminTestimonials() {
                 value={eventPlace}
                 onChange={(e) => setEventPlace(e.target.value)}
                 onKeyDown={handleEventPlaceKeyDown}
-                placeholder="e.g., San Fransisco"
+                placeholder="e.g., San Francisco"
                 autoComplete="off"
                 className="block w-full rounded-md border border-gray-300 bg-transparent px-3 py-1.5 text-base text-gray-900 outline-none focus:ring-2 focus:ring-indigo-600"
               />
