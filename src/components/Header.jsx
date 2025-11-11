@@ -85,7 +85,7 @@ const Header = forwardRef(function Header(_, ref) {
         <DialogPanel className="fixed inset-y-0 right-0 z-[60] w-full overflow-y-auto bg-white p-6 sm:max-w-sm sm:ring-1 sm:ring-gray-900/10">
           <div className="flex items-center justify-between">
             <h1 className="text-3xl font-bold" style={{ fontFamily: "'My Soul', cursive" }}>
-              The Arroju&apos;s
+              Stories By ARK
             </h1>
             <button
               onClick={() => setMobileMenuOpen(false)}
