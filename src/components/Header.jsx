@@ -37,7 +37,7 @@ const Header = forwardRef(function Header(_, ref) {
       )}
     >
       <nav className="mx-auto flex max-w-7xl items-center justify-between p-6 lg:px-8">
-        <h1 className="text-3xl font-bold" style={{ fontFamily: "'My Soul', cursive" }}>
+        <h1 className="text-3xl font-bold" style={{ fontFamily: "'Suravaram', serif" }}>
           Stories By ARK
         </h1>
 
@@ -84,7 +84,7 @@ const Header = forwardRef(function Header(_, ref) {
         <div className="fixed inset-0 z-50" />
         <DialogPanel className="fixed inset-y-0 right-0 z-[60] w-full overflow-y-auto bg-white p-6 sm:max-w-sm sm:ring-1 sm:ring-gray-900/10">
           <div className="flex items-center justify-between">
-            <h1 className="text-3xl font-bold" style={{ fontFamily: "'My Soul', cursive" }}>
+            <h1 className="text-3xl font-bold" style={{ fontFamily: "'Suravaram', serif" }}>
               Stories By ARK
             </h1>
             <button
